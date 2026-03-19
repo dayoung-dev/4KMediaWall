@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Glistening Ripples - 4K Media Art</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Noto+Serif+KR:wght@200;300;400&display=swap" rel="stylesheet">
+
+    <!-- Three.js 및 Post-processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FilmShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/FilmPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/BokehShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/BokehPass.js"></script>
+
+    <!-- GSAP for UI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            background-color: #0b3d36; 
+            font-family: 'Cormorant Garamond', 'Noto Serif KR', serif;
+            transition: cursor 0.3s; color: #d1f2eb;
+        }
+        body.hide-cursor { cursor: none; }
+        /* [4K 최적화] canvas가 물리적 픽셀에 상관없이 화면에 꽉 차도록 설정 */
+        #webgl-canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; z-index: 1; }
+        
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; justify-content: center; align-items: center; z-index: 25;
+            background: rgba(11, 61, 54, 0.85); backdrop-filter: blur(15px);
+        }
+        .message { font-size: 1.2rem; font-weight: 300; letter-spacing: 0.1em; text-align: center; color: #a3e4d7; }
+        #helper-text {
+            position: absolute; bottom: 30px; right: 40px; font-size: 0.9rem;
+            color: rgba(163, 228, 215, 0.5); z-index: 15; letter-spacing: 0.15em;
+            pointer-events: none; opacity: 0; transition: opacity 0.5s;
+        }
+        #audio-helper {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 1.2rem; font-weight: 300; font-style: italic; color: #d1f2eb;
+            z-index: 20; letter-spacing: 0.1em; pointer-events: none;
+            animation: breatheUI 4s infinite ease-in-out;
+            background: rgba(255, 255, 255, 0.05); padding: 25px 50px;
+            border-radius: 60px; backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 30px rgba(118, 215, 196, 0.2);
+        }
+        @keyframes breatheUI {
+            0% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.97); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.03); box-shadow: 0 0 50px rgba(118, 215, 196, 0.4); }
+            100% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.97); }
+        }
+        #settings-layer {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(11, 61, 54, 0.85); backdrop-filter: blur(25px);
+            padding: 40px 50px; border-radius: 20px; border: 1px solid rgba(163, 228, 215, 0.2);
+            z-index: 30; display: none; flex-direction: column; align-items: center; gap: 25px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6); min-width: 300px;
+        }
+        #settings-layer h2 { margin: 0; color: #d1f2eb; font-weight: 300; letter-spacing: 0.15em; font-size: 1.5rem; }
+        .setting-item { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+        .setting-item span { font-size: 1.1rem; color: #a3e4d7; font-weight: 300; letter-spacing: 0.05em;}
+        .toggle-btn { 
+            background: transparent; border: 1px solid #76d7c4; color: #76d7c4; 
+            padding: 8px 25px; border-radius: 30px; cursor: pointer; transition: all 0.3s ease; 
+            font-family: inherit; font-size: 1rem; letter-spacing: 0.1em;
+        }
+        .toggle-btn.on { background: #76d7c4; color: #0b3d36; font-weight: 600; box-shadow: 0 0 15px rgba(118, 215, 196, 0.4); }
+        .settings-desc { font-size: 0.85rem; color: rgba(163, 228, 215, 0.5); margin-top: 15px; letter-spacing: 0.05em; text-align: center;}
+        #sample-canvas, #webcam-video { display: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="webgl-canvas"></canvas>
+    <video id="webcam-video" autoplay playsinline muted></video>
+    <canvas id="sample-canvas"></canvas>
+    
+    <div id="ui-layer"><p class="message" id="error-msg">카메라 접근이 차단되어, 가상의 빛무리가 수면 위로 쏟아집니다.</p></div>
+
+    <div id="settings-layer">
+        <h2>설정 (Settings)</h2>
+        <div class="setting-item">
+            <span>웹캠 활성화</span>
+            <button id="btn-webcam" class="toggle-btn on">ON</button>
+        </div>
+        <p class="settings-desc">설정 창을 닫으려면 ESC를 다시 누르세요.</p>
+    </div>
+
+    <div id="helper-text">[ESC] 수면 재정렬 및 설정 토글</div>
+    <div id="audio-helper">Touch the water to awaken the ripples...</div>
+
+<script>
+    /**
+     * [4K 최적화] RENDER_SCALE: 4K 해상도 렌더링 부하를 줄이기 위한 내부 해상도 스케일.
+     * 1.0 = 4K 1:1 매칭 (프레임 저하 위험), 0.7 = 약 1440p (화질/성능 타협), 0.5 = 1080p (성능 최고)
+     */
+    const RENDER_SCALE = 0.7; 
+
+    const CONFIG = {
+        MAX_PARTICLES: 8000,      
+        SAMPLE_WIDTH: 128,         
+        SAMPLE_HEIGHT: 128,
+        MOTION_THRESHOLD: 25,
+        PRESENCE_THRESHOLD: 35, 
+        BUOYANCY: 0.3,            
+        PARTICLE_SIZE: 4.5,        
+        WORLD_WIDTH: 420,
+        WORLD_HEIGHT: 210,
+        WORLD_DEPTH: 120            
+    };
+
+    const STRATA_PALETTE = [
+        0x48c9b0, 0x26a69a, 0x76d7c4, 0x81ecec, 
+        0xa3e4d7, 0xd1f2eb, 0xffe0b2, 0xfad7a1
+    ];
+
+    let scene, camera, renderer, composer, bloomPass;
+    let particles, positions, colors, velocities, active, settled, life, phase;
+    let pVx, pVz; 
+    let particleGeometry, particleMaterial, particleSystem;
+    let particleIdx = 0;
+    let videoPlane, videoMat; 
+    let fgWaveMat1, fgWaveMat2; 
+    let targetBloomStrength = 0.35; 
+    
+    let ducks = []; 
+    const MAX_DUCKS = 5; 
+
+    const video = document.getElementById('webcam-video');
+    const sampleCanvas = document.getElementById('sample-canvas');
+    const ctx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+    
+    let previousImageData = null;
+    let bgData = null; 
+    let globalMotion = { x: 0, y: 0, intensity: 0 };
+    let currentVisualIntensity = 0; 
+    
+    let lastDuckSpawnTime = 0; 
+    const DUCK_SPAWN_INTERVAL = 3500; 
+
+    let isMockMode = false, mockAngle = 0, isUIHidden = true; 
+    let isWebcamEnabled = true; 
+
+    let lastProcessMotionTime = 0;
+
+    // [4K 최적화 GC 방지] 매 프레임 발생하는 배열 및 객체 생성을 막기 위한 전역 재사용 변수
+    const _tempBaseColor = new THREE.Color();
+    const _tempNextColor = new THREE.Color();
+    const _tempCamColor = new THREE.Color();
+    let _activePixels = []; // length 컨트롤로 재사용
+    let _presencePixels = [];
+    let _clusters = [];
+
+    document.getElementById('btn-webcam').addEventListener('click', function(e) {
+        e.stopPropagation();
+        isWebcamEnabled = !isWebcamEnabled;
+        this.textContent = isWebcamEnabled ? "ON" : "OFF";
+        this.classList.toggle('on', isWebcamEnabled);
+        
+        if (video.srcObject) {
+            video.srcObject.getVideoTracks().forEach(track => { track.enabled = isWebcamEnabled; });
+        }
+        
+        if (!isWebcamEnabled) {
+            isMockMode = true; 
+        } else {
+            if (video.srcObject && video.readyState >= 2) isMockMode = false;
+        }
+    });
+
+    const AudioEngine = {
+        ctx: null, convolver: null, masterGain: null, droneGain: null, harmonicGains: [], windGain: null, windFilter: null,
+        isInitialized: false, isMuted: false, lastChimeTime: 0, lastAmbienceUpdate: 0,
+        scale: [196.00, 220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25],
+
+        init: function() {
+            if (this.isInitialized) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioContext();
+            
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = 0.65;
+            this.masterGain.connect(this.ctx.destination);
+            
+            this.convolver = this.ctx.createConvolver();
+            const length = this.ctx.sampleRate * 6.0; 
+            const impulse = this.ctx.createBuffer(2, length, this.ctx.sampleRate);
+            for (let i = 0; i < 2; i++) {
+                const channel = impulse.getChannelData(i);
+                let lastVal = 0;
+                for (let j = 0; j < length; j++) {
+                    const noise = Math.random() * 2 - 1;
+                    const decay = Math.exp(-j / (this.ctx.sampleRate * 1.5));
+                    const filterCoeff = Math.max(0.02, 0.4 * Math.exp(-j / (this.ctx.sampleRate * 0.8)));
+                    lastVal += filterCoeff * (noise - lastVal);
+                    channel[j] = lastVal * decay;
+                }
+            }
+            this.convolver.buffer = impulse;
+            this.convolver.connect(this.masterGain);
+            
+            this.startDrone();
+            this.startWind();
+            this.isInitialized = true;
+        },
+        
+        startDrone: function() {
+            this.droneGain = this.ctx.createGain();
+            this.droneGain.gain.value = 0.05;
+            this.droneGain.connect(this.convolver);
+            
+            [55.0, 82.41, 110.0].forEach(f => {
+                const o = this.ctx.createOscillator();
+                o.type = 'sine'; o.frequency.value = f; o.connect(this.droneGain); o.start();
+            });
+
+            const lfo = this.ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.03;
+            const lfoGain = this.ctx.createGain(); lfoGain.gain.value = 0.04;
+            lfo.connect(lfoGain); lfoGain.connect(this.droneGain.gain); lfo.start();
+
+            this.harmonicGains = [];
+            [220.0, 329.63, 440.0].forEach(freq => {
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.frequency.value = freq; gain.gain.value = 0.0;
+                osc.connect(gain); gain.connect(this.convolver); osc.start();
+                this.harmonicGains.push(gain);
+            });
+        },
+        
+        startWind: function() {
+            const bufferSize = this.ctx.sampleRate * 2;
+            const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+            
+            const noise = this.ctx.createBufferSource(); noise.buffer = noiseBuffer; noise.loop = true;
+            this.windFilter = this.ctx.createBiquadFilter(); this.windFilter.type = 'lowpass'; this.windFilter.frequency.value = 60; 
+            this.windGain = this.ctx.createGain(); this.windGain.gain.value = 0.0; 
+            
+            noise.connect(this.windFilter); this.windFilter.connect(this.windGain); this.windGain.connect(this.convolver);
+            noise.start();
+        },
+
+        toggleMute: function() {
+            if (!this.isInitialized) return;
+            this.isMuted = !this.isMuted;
+            this.masterGain.gain.setTargetAtTime(this.isMuted ? 0.0 : 0.65, this.ctx.currentTime, 0.5);
+        },
+
+        updateMotion: function(motionIntensity) {
+            if (!this.isInitialized) return;
+            this.windGain.gain.setTargetAtTime(motionIntensity * 0.12, this.ctx.currentTime, 1.5);
+            this.windFilter.frequency.setTargetAtTime(60 + motionIntensity * 400, this.ctx.currentTime, 1.5);
+        },
+
+        updateAmbience: function(surfaceCount) {
+            if (!this.isInitialized) return;
+            const now = this.ctx.currentTime;
+            if (now - this.lastAmbienceUpdate < 0.5) return; 
+            this.lastAmbienceUpdate = now;
+
+            const normVolume = Math.max(0, Math.min(1, surfaceCount / 15000));
+            this.harmonicGains[0].gain.setTargetAtTime(normVolume * 0.05, now, 3.5);
+            this.harmonicGains[1].gain.setTargetAtTime(Math.pow(normVolume, 2) * 0.04, now, 3.5);
+            this.harmonicGains[2].gain.setTargetAtTime(Math.pow(normVolume, 3) * 0.04, now, 3.5);
+        },
+
+        tick: function(surfaceFoamCount = 0) {
+            if (!this.isInitialized || this.isMuted) return;
+            if (surfaceFoamCount > 500 && Math.random() < 0.05 && this.ctx.currentTime - this.lastChimeTime > 0.15) {
+                const intensity = Math.min(surfaceFoamCount / 8000, 0.8);
+                const noteIndex = Math.floor(Math.random() * this.scale.length);
+                this.playBubble(this.scale[noteIndex], intensity * 0.35);
+                this.lastChimeTime = this.ctx.currentTime;
+            }
+        },
+        
+        playBubble: function(pitch, velocity) {
+            const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+            osc.type = 'sine'; 
+            const now = this.ctx.currentTime;
+            osc.frequency.setValueAtTime(pitch * 0.5, now);
+            osc.frequency.exponentialRampToValueAtTime(pitch * 1.5, now + 0.08); 
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(velocity, now + 0.01); 
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15); 
+            osc.connect(gain); gain.connect(this.convolver);
+            osc.start(now); osc.stop(now + 0.2);
+        }
+    };
+
+    window.addEventListener('load', startExperience);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('click', () => {
+        if (!AudioEngine.isInitialized) {
+            AudioEngine.init();
+            gsap.to('#audio-helper', { opacity: 0, duration: 1.5, onComplete: () => {
+                document.getElementById('audio-helper').style.display = 'none';
+            } });
+        }
+    });
+
+    function startExperience() {
+        initWebcam().then(() => {
+            enterExhibitionMode(); initThree(); animate();
+        }).catch(() => {
+            isMockMode = true;
+            document.getElementById('ui-layer').style.display = 'flex';
+            setTimeout(() => {
+                gsap.to('#ui-layer', {opacity: 0, duration: 1.5, onComplete: () => {
+                    document.getElementById('ui-layer').style.display = 'none';
+                }});
+                enterExhibitionMode(); initThree(); animate();
+            }, 3500);
+        });
+    }
+
+    function enterExhibitionMode() {
+        document.body.classList.add('hide-cursor');
+        gsap.to('#helper-text', { opacity: 0, duration: 1 }); 
+        isUIHidden = true;
+    }
+
+    function handleKeyDown(e) {
+        if (e.key === 'Escape') {
+            isUIHidden = !isUIHidden;
+            const settingsLayer = document.getElementById('settings-layer');
+            if (isUIHidden) {
+                document.body.classList.add('hide-cursor');
+                gsap.to('#helper-text', { opacity: 0, duration: 0.5 });
+                gsap.to('#settings-layer', { opacity: 0, duration: 0.3, onComplete: () => settingsLayer.style.display = 'none' });
+            } else {
+                document.body.classList.remove('hide-cursor');
+                gsap.to('#helper-text', { opacity: 1, duration: 0.5 });
+                settingsLayer.style.display = 'flex';
+                gsap.fromTo('#settings-layer', { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.4 });
+            }
+            if (AudioEngine.isInitialized) AudioEngine.toggleMute();
+        } else if (e.key === 'r' || e.key === 'R') {
+            spawnManualDuck();
+        }
+    }
+
+    function initWebcam() {
+        return new Promise((resolve, reject) => {
+            sampleCanvas.width = CONFIG.SAMPLE_WIDTH; sampleCanvas.height = CONFIG.SAMPLE_HEIGHT;
+            navigator.mediaDevices.getUserMedia({ video: { width: CONFIG.SAMPLE_WIDTH, height: CONFIG.SAMPLE_HEIGHT, facingMode: "user" } })
+            .then((stream) => {
+                video.srcObject = stream;
+                video.onloadedmetadata = () => { video.play(); resolve(); };
+            }).catch(reject);
+        });
+    }
+
+    function initThree() {
+        const canvas = document.getElementById('webgl-canvas');
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x061f1c); 
+        scene.fog = new THREE.FogExp2(0x061f1c, 0.0035); 
+        
+        camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+        camera.position.set(0, 32, 250); camera.lookAt(0, -15, 0);
+
+        // [4K 최적화] 포스트 프로세싱 시 안티앨리어싱(MSAA)을 끄면 퍼포먼스가 대폭 상승합니다.
+        // powerPreference: 'high-performance'로 외장 GPU 우선 할당 유도.
+        renderer = new THREE.WebGLRenderer({ 
+            canvas: canvas, 
+            antialias: false, 
+            alpha: false,
+            powerPreference: "high-performance",
+            stencil: false
+        });
+        
+        renderer.setPixelRatio(1); // 무조건 1 고정 (레티나 무시)
+        // [4K 최적화] RENDER_SCALE 적용: 캔버스 크기는 CSS가 100%로 잡고, 내부 버퍼 해상도만 낮춤.
+        renderer.setSize(window.innerWidth * RENDER_SCALE, window.innerHeight * RENDER_SCALE, false);
+
+        const ambientLight = new THREE.AmbientLight(0xd1f2eb, 0.65); scene.add(ambientLight);
+        const dirLight = new THREE.PointLight(0xffe0b2, 2.2, 800); dirLight.position.set(0, 150, 150); scene.add(dirLight);
+
+        const roomGeo = new THREE.BoxGeometry(600, 420, 320);
+        const edgesMat = new THREE.LineBasicMaterial({ color: 0x26a69a, transparent: true, opacity: 0.05 }); 
+        const roomEdges = new THREE.LineSegments(new THREE.EdgesGeometry(roomGeo), edgesMat);
+        roomEdges.position.set(0, 55, -60); scene.add(roomEdges);
+
+        createRubberDucks();
+
+        const videoTex = new THREE.VideoTexture(video);
+        videoTex.minFilter = THREE.LinearFilter; videoTex.magFilter = THREE.LinearFilter;
+
+        videoMat = new THREE.ShaderMaterial({
+            uniforms: { tDiffuse: { value: videoTex }, time: { value: 0.0 } },
+            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `
+                uniform sampler2D tDiffuse; uniform float time; varying vec2 vUv;
+                float rand(vec2 co){ return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453); }
+                vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+                vec2 fade(vec2 t) {return t*t*t*(t*(t*6.0-15.0)+10.0);}
+                float cnoise(vec2 P){
+                  vec4 Pi = floor(P.xyxy) + vec4(0.0, 0.0, 1.0, 1.0); vec4 Pf = fract(P.xyxy) - vec4(0.0, 0.0, 1.0, 1.0);
+                  Pi = mod(Pi, 289.0); vec4 ix = Pi.xzxz; vec4 iy = Pi.yyww; vec4 fx = Pf.xzxz; vec4 fy = Pf.yyww;
+                  vec4 i = permute(permute(ix) + iy); vec4 gx = 2.0 * fract(i * 0.0243902439) - 1.0; 
+                  vec4 gy = abs(gx) - 0.5; vec4 tx = floor(gx + 0.5); gx = gx - tx;
+                  vec2 g00 = vec2(gx.x,gy.x); vec2 g10 = vec2(gx.y,gy.y); vec2 g01 = vec2(gx.z,gy.z); vec2 g11 = vec2(gx.w,gy.w);
+                  vec4 norm = 1.79284291400159 - 0.85373472095314 * vec4(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11));
+                  g00 *= norm.x; g01 *= norm.y; g10 *= norm.z; g11 *= norm.w;
+                  float n00 = dot(g00, vec2(fx.x, fy.x)); float n10 = dot(g10, vec2(fx.y, fy.y));
+                  float n01 = dot(g01, vec2(fx.z, fy.z)); float n11 = dot(g11, vec2(fx.w, fy.w));
+                  vec2 fade_xy = fade(Pf.xy); vec2 n_x = mix(vec2(n00, n01), vec2(n10, n11), fade_xy.x);
+                  return 2.3 * mix(n_x.x, n_x.y, fade_xy.y);
+                }
+                void main() {
+                    vec2 uv = vec2(1.0 - vUv.x, vUv.y); 
+                    float wave = sin(uv.y * 8.0 + time * 1.0) * 0.02 + sin(uv.x * 12.0 - time * 0.6) * 0.02;
+                    vec2 distortOffset = vec2(cnoise(uv * 1.5 + time * 0.15), cnoise(uv * 3.0 - time * 0.2)) * 0.08 + vec2(wave);
+                    vec2 distortedUv = uv + distortOffset;
+                    
+                    vec4 texColor = vec4(texture2D(tDiffuse, distortedUv + vec2(0.008, 0.0)).r, texture2D(tDiffuse, distortedUv).g, texture2D(tDiffuse, distortedUv - vec2(0.008, 0.0)).b, 1.0);
+                    float luma = smoothstep(0.1, 0.9, dot(texColor.rgb, vec3(0.299, 0.587, 0.114))); 
+                    
+                    vec3 waterColor = mix(vec3(0.04, 0.24, 0.21), vec3(0.46, 0.84, 0.77), luma) + vec3(0.9, 0.55, 0.25) * smoothstep(0.4, 1.0, luma) * 1.2; 
+                    float sparkle = smoothstep(0.65, 0.95, cnoise(distortedUv * 60.0 - time * 0.5) * cnoise(distortedUv * 80.0 + time * 0.3));
+                    float sunMask = exp(-distance(uv, vec2(0.5, 0.7)) * 2.0); 
+                    waterColor += vec3(1.0, 0.95, 0.85) * sparkle * sunMask * 3.5;
+
+                    float dist = distance(uv, vec2(0.5));
+                    float finalAlpha = max((luma * 0.25 + 0.05) * smoothstep(0.5, 0.15, dist), sparkle * sunMask * 0.7);
+                    gl_FragColor = vec4(waterColor, finalAlpha);
+                }
+            `,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending 
+        });
+
+        videoPlane = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.WORLD_WIDTH * 1.85, CONFIG.WORLD_HEIGHT * 1.85), videoMat);
+        videoPlane.position.set(0, 25, -160); scene.add(videoPlane);
+
+        fgWaveMat1 = createWaveMat(0.008, 0.8, 35.0, 0.012, 0.6, 20.0, 0.0, 0.8, vec3(0.02, 0.15, 0.13));
+        const fgWave1 = new THREE.Mesh(new THREE.PlaneGeometry(1200, 250, 64, 16), fgWaveMat1);
+        fgWave1.position.set(0, -90, 120); scene.add(fgWave1);
+
+        fgWaveMat2 = createWaveMat(0.011, 1.1, 25.0, 0.009, 0.9, 22.0, 0.1, 0.75, vec3(0.03, 0.18, 0.16));
+        const fgWave2 = new THREE.Mesh(new THREE.PlaneGeometry(1200, 300, 64, 16), fgWaveMat2);
+        fgWave2.position.set(0, -110, 180); scene.add(fgWave2);
+
+        fgWave1.layers.set(1); fgWave2.layers.set(1);
+
+        const total = CONFIG.MAX_PARTICLES;
+        positions = new Float32Array(total * 3); colors = new Float32Array(total * 3);
+        velocities = new Float32Array(total); active = new Uint8Array(total);
+        settled = new Float32Array(total); life = new Float32Array(total); phase = new Float32Array(total);
+        pVx = new Float32Array(total); pVz = new Float32Array(total);
+
+        for (let i = 0; i < total; i++) { positions[i * 3 + 1] = -9999; life[i] = 0; phase[i] = Math.random() * Math.PI * 2; }
+
+        particleGeometry = new THREE.BufferGeometry();
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+        particleGeometry.setAttribute('customColor', new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage));
+        particleGeometry.setAttribute('aSettled', new THREE.BufferAttribute(settled, 1).setUsage(THREE.DynamicDrawUsage));
+        particleGeometry.setAttribute('aLife', new THREE.BufferAttribute(life, 1).setUsage(THREE.DynamicDrawUsage));
+        particleGeometry.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+
+        const initialScale = (window.innerHeight * RENDER_SCALE) / 1080.0;
+
+        particleMaterial = new THREE.ShaderMaterial({
+            uniforms: THREE.UniformsUtils.merge([ THREE.UniformsLib["fog"], { time: { value: 0.0 }, uIntensity: { value: 0.0 }, uScale: { value: initialScale } } ]),
+            vertexShader: `
+                attribute vec3 customColor; attribute float aSettled; attribute float aLife; attribute float aPhase;
+                varying vec3 vColor; varying float vSettled; varying float vLife; varying float vPhase; 
+                varying float vWorldY; varying float vWorldZ;
+                uniform float time; uniform float uScale;
+                #include <fog_pars_vertex>
+                void main() {
+                    vColor = customColor; vSettled = aSettled; vLife = aLife; vPhase = aPhase;
+                    vec3 finalPos = position;
+                    float swayAmount = (aSettled > 2.5) ? 0.2 : 1.2;
+                    if(aSettled > 0.5) { 
+                        finalPos.x += sin(time * 1.0 + position.z * 0.05 + aPhase) * swayAmount; 
+                        finalPos.z += cos(time * 0.8 + position.x * 0.05 + aPhase) * swayAmount; 
+                    } else { finalPos.x += sin(time * 1.2 + aPhase) * 0.8; }
+                    
+                    vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
+                    gl_Position = projectionMatrix * mvPosition;
+                    vWorldY = finalPos.y; vWorldZ = finalPos.z; 
+                    
+                    float size = ((aSettled > 2.5) ? 85.0 : (aSettled > 1.5) ? 90.0 : (aSettled > 0.5) ? 80.0 : 60.0) + (sin(time * 1.5 + aPhase) * 0.5 + 0.5) * 20.0; 
+                    size *= mix(0.4, 1.3, smoothstep(-60.0, 60.0, finalPos.z));
+                    gl_PointSize = size * uScale * (300.0 / -mvPosition.z) * (0.2 + 0.8 * aLife);
+                    #include <fog_vertex>
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor; varying float vSettled; varying float vLife; varying float vPhase; 
+                varying float vWorldY; varying float vWorldZ;
+                uniform float time; uniform float uIntensity; 
+                #include <fog_pars_fragment>
+                void main() {
+                    vec2 coord = gl_PointCoord - vec2(0.5); 
+                    // [4K 최적화] length() 연산 대신 빠르고 간단한 dot() 내적으로 discard 체크
+                    float distSq = dot(coord, coord);
+                    if(distSq > 0.25) discard; 
+                    float dist = sqrt(distSq);
+                    
+                    float luma = dot(vColor, vec3(0.299, 0.587, 0.114));
+                    vec3 desatColor = mix(vColor, vec3(luma), 0.85); 
+                    
+                    float bubbleRim = smoothstep(0.5, 0.35, dist) - smoothstep(0.45, 0.3, dist);
+                    float bubbleFilm = exp(-dist * 4.0) * 0.1; 
+                    float bubbleHighlight = smoothstep(0.3, 0.1, length(coord - vec2(-0.15, -0.15))) * 0.7; 
+                    
+                    vec3 hueShift = vec3(sin(vPhase)*0.12, cos(vPhase*1.3)*0.12, sin(vPhase*0.7)*0.12);
+                    float bubbleAlpha = mix((bubbleRim * 0.6 + bubbleFilm + bubbleHighlight) * 0.35, (bubbleRim * 0.6 + bubbleFilm + bubbleHighlight) * 0.8, uIntensity);
+                    vec3 bubbleColor = mix(mix(desatColor, vec3(0.55, 0.75, 0.7) + hueShift, bubbleHighlight + bubbleRim * 0.3), mix(desatColor, vec3(1.0, 0.98, 0.9) + hueShift, bubbleHighlight + bubbleRim * 0.3), uIntensity);
+
+                    float sharpGlow = exp(-abs(coord.x) * 50.0) * exp(-abs(coord.y) * 4.0) + exp(-abs(coord.y) * 50.0) * exp(-abs(coord.x) * 4.0);
+                    float softGlow = exp(-abs(coord.x) * 12.0) * exp(-abs(coord.y) * 8.0) + exp(-abs(coord.y) * 12.0) * exp(-abs(coord.x) * 8.0);
+                    float core = exp(-dist * 25.0);
+                    
+                    float rippleAlpha = mix(sharpGlow * 0.3 + softGlow * 0.15 + core * 0.4, sharpGlow * 1.2 + softGlow * 0.8 + core * 1.5, uIntensity);
+                    float normalizedSettled = clamp(vSettled, 0.0, 1.0);
+                    
+                    float farFactor = smoothstep(-10.0, -60.0, vWorldZ); 
+                    float alpha = mix(bubbleAlpha, rippleAlpha, normalizedSettled) * mix(vLife, max(vLife, 0.6), farFactor) * mix(1.0, 0.7 + 0.3 * sin(vPhase * 8.0 + time * 1.5), normalizedSettled) * smoothstep(25.0, -15.0, vWorldZ);
+                    
+                    float foamFactor = smoothstep(-2.0, 8.0, vWorldY) * (sin(vPhase * 5.0) * 0.5 + 0.5) * normalizedSettled;
+                    vec3 baseColor = mix(mix(bubbleColor, vColor, normalizedSettled), mix(vec3(0.45, 0.65, 0.6), vec3(0.85, 0.9, 0.85), uIntensity), foamFactor * mix(0.4, 0.5, uIntensity));
+                    baseColor = mix(baseColor, vec3(0.4, 0.7, 0.65), farFactor * 0.5);
+
+                    float pRand = fract(sin(vPhase * 12.9898) * 43758.5453);
+                    vec3 finalColor = baseColor * (1.0 + foamFactor * mix(0.1, 0.3, uIntensity)) + mix(vec3(0.4, 0.75, 0.8), vec3(1.0, 1.0, 1.0), pRand) * sharpGlow * (0.5 + pRand * 1.8) * normalizedSettled;
+                    float finalAlphaMix = mix(alpha * 0.3, alpha * 1.0, uIntensity);
+
+                    if (vSettled > 1.5) {
+                        bool isHigh = vSettled > 2.5;
+                        vec3 foamColor = mix(isHigh ? vec3(0.4, 0.7, 0.8) : vec3(0.5, 0.8, 0.9), isHigh ? vec3(0.85, 0.95, 1.0) : vec3(0.95, 0.98, 1.0), pRand);
+                        finalColor = foamColor * ((isHigh ? 0.6 : 0.8) + sharpGlow * ((isHigh ? 0.6 : 1.0) + pRand * (isHigh ? 1.0 : 1.5)) + softGlow * (isHigh ? 0.5 : 0.8));
+                        finalAlphaMix = (core * (isHigh ? 0.7 : 0.8) + softGlow * (isHigh ? 0.4 : 0.5) + sharpGlow * (isHigh ? 0.8 : 1.0)) * mix(isHigh ? 0.4 : 0.5, isHigh ? 1.0 : 1.2, pRand) * mix(1.0, 0.2, farFactor); 
+                    }
+                    gl_FragColor = vec4(min(finalColor, vec3(1.0)), min(finalAlphaMix, 1.0));
+                    #include <fog_fragment>
+                }
+            `,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: true 
+        });
+
+        particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+        particleSystem.frustumCulled = false; particleSystem.layers.set(1); scene.add(particleSystem);
+
+        createInitialStrata(); 
+        window.addEventListener('resize', onWindowResize, false);
+
+        // --- Post Processing Pipeline ---
+        const renderScene0 = new THREE.RenderPass(scene, camera); renderScene0.clear = true;
+        const origRender0 = renderScene0.render;
+        renderScene0.render = function(r, w, b, d, m) { camera.layers.set(0); origRender0.call(this, r, w, b, d, m); };
+
+        const bokehPass = new THREE.BokehPass(scene, camera, { focus: 0.27, aperture: 0.003, maxblur: 0.01, width: window.innerWidth * RENDER_SCALE, height: window.innerHeight * RENDER_SCALE });
+
+        const renderScene1 = new THREE.RenderPass(scene, camera); renderScene1.clear = false; 
+        const origRender1 = renderScene1.render;
+        renderScene1.render = function(r, w, b, d, m) { camera.layers.set(1); const oldBg = scene.background; scene.background = null; origRender1.call(this, r, w, b, d, m); scene.background = oldBg; camera.layers.set(0); };
+
+        // [4K 최적화] Bloom 버퍼를 RENDER_SCALE에 맞춰 추가로 더 낮춤 (예: 1080p 기준의 1/4 = 엄청난 성능 이득)
+        const bloomRes = new THREE.Vector2((window.innerWidth * RENDER_SCALE) / 4, (window.innerHeight * RENDER_SCALE) / 4);
+        bloomPass = new THREE.UnrealBloomPass(bloomRes, 0.8, 0.6, 0.35);
+        const filmPass = new THREE.FilmPass(0.15, 0.0, 0, false); 
+
+        composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene0);
+        composer.addPass(bokehPass); // Bokeh가 가장 부하가 큽니다. 끊기면 이 라인을 주석처리하세요.
+        composer.addPass(renderScene1);
+        composer.addPass(bloomPass);
+        composer.addPass(filmPass);
+    }
+
+    function vec3(r, g, b) { return `vec3(${r}, ${g}, ${b})`; }
+    function createWaveMat(freq1, speed1, amp1, freq2, speed2, amp2, s1, s2, colVec) {
+        return new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0.0 } },
+            vertexShader: `uniform float time; varying vec2 vUv; void main() { vUv = uv; vec3 pos = position; pos.y += sin(pos.x * ${freq1} + time * ${speed1}) * ${amp1} + cos(pos.x * ${freq2} - time * ${speed2}) * ${amp2}; gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0); }`,
+            fragmentShader: `varying vec2 vUv; void main() { float alpha = 1.0 - smoothstep(${s1}, ${s2}, vUv.y); gl_FragColor = vec4(mix(vec3(0.0), ${colVec}, vUv.y), alpha); }`,
+            transparent: true, depthWrite: false, blending: THREE.NormalBlending
+        });
+    }
+
+    // 오리 관련 코드는 이전과 동일하므로 논리 구조만 유지하여 압축
+    function applySubmergeEffect(mat) {
+        mat.userData = { waterLevel: { value: 0.0 }, duckScale: { value: 1.0 } };
+        mat.onBeforeCompile = (shader) => {
+            shader.uniforms.uWaterLevel = mat.userData.waterLevel; shader.uniforms.uDuckScale = mat.userData.duckScale;
+            shader.vertexShader = `varying vec3 vWorldPositionSub;\n${shader.vertexShader}`.replace(`#include <begin_vertex>`, `#include <begin_vertex>\n vWorldPositionSub = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+            shader.fragmentShader = `varying vec3 vWorldPositionSub; uniform float uWaterLevel; uniform float uDuckScale;\n${shader.fragmentShader}`.replace(`#include <dithering_fragment>`, `#include <dithering_fragment>\n float depth = (uWaterLevel - vWorldPositionSub.y) / uDuckScale; float submerge = smoothstep(-2.0, 4.0, depth); gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.04, 0.24, 0.21) * 1.5, submerge * 0.95); gl_FragColor.a *= (1.0 - smoothstep(1.0, 6.0, depth));`);
+        };
+    }
+
+    function createRipplePlaneMaterial() {
+        return new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0.0 }, uOpacity: { value: 1.0 } },
+            vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `uniform float time; uniform float uOpacity; varying vec2 vUv; void main() { float dist = distance(vUv, vec2(0.5)); if(dist > 0.5) discard; float ring = fract(dist * 8.0 - time * 1.5); float ripple = smoothstep(0.4, 0.6, ring) - smoothstep(0.6, 0.8, ring); float core = smoothstep(0.15, 0.0, dist); gl_FragColor = vec4(mix(mix(vec3(0.46, 0.84, 0.77), vec3(1.0), ripple), vec3(1.0), core), max(ripple * smoothstep(0.5, 0.1, dist) * 0.8, core * 0.95) * uOpacity); }`,
+            transparent: true, depthWrite: false, blending: THREE.NormalBlending
+        });
+    }
+
+    function createDuckParts(baseColor, isBase) {
+        let group = new THREE.Group();
+        const matArgs = { metalness: 0.1, roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.25, transparent: true, opacity: 1.0 };
+        const bodyMat = new THREE.MeshPhysicalMaterial({ color: baseColor, emissive: 0x0a3d35, emissiveIntensity: 0.85, ...matArgs });
+        const beakMat = new THREE.MeshPhysicalMaterial({ color: 0xff6600, emissive: 0x4a1100, emissiveIntensity: 0.8, ...matArgs, clearcoat: 0.7 });
+        const eyeMat = new THREE.MeshPhysicalMaterial({ color: 0x050505, emissive: 0x111111, emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.05, clearcoat: 1.0, transparent: true, opacity: 1.0 });
+        [bodyMat, beakMat, eyeMat].forEach(applySubmergeEffect);
+
+        const addMesh = (geo, mat, scale, pos, rotX) => { const m = new THREE.Mesh(geo, mat); m.scale.set(...scale); m.position.set(...pos); if(rotX) m.rotation.x = rotX; group.add(m); return m; };
+        
+        addMesh(new THREE.SphereGeometry(11, 32, 32), bodyMat, [1.05, 0.85, 1.3], [0, 0, 0]);
+        addMesh(new THREE.SphereGeometry(8.5, 32, 32), bodyMat, [1,1,1], [0, 10.5, 6]);
+        addMesh(new THREE.SphereGeometry(5, 32, 32), bodyMat, [1, 0.8, 1.6], [0, 4, -10.5], Math.PI/8);
+        addMesh(new THREE.SphereGeometry(5, 32, 32), bodyMat, [0.3, 0.6, 1.3], [-11.5, 2, 0], -Math.PI/12);
+        addMesh(new THREE.SphereGeometry(5, 32, 32), bodyMat, [0.3, 0.6, 1.3], [11.5, 2, 0], -Math.PI/12);
+        
+        addMesh(new THREE.SphereGeometry(3.5, 32, 32), beakMat, [1.1, 0.4, 1.4], [0, 10.2, 13.5], Math.PI/16);
+        addMesh(new THREE.SphereGeometry(3.2, 32, 32), beakMat, [1.0, 0.3, 1.2], [0, 9.2, 13.0]);
+        
+        const leftEye = addMesh(new THREE.SphereGeometry(1.2, 16, 16), eyeMat, [1,1,1], [-3.5, 12.5, 13.0]);
+        const rightEye = addMesh(new THREE.SphereGeometry(1.2, 16, 16), eyeMat, [1,1,1], [3.5, 12.5, 13.0]);
+        
+        const rippleMat = createRipplePlaneMaterial();
+        const ripplePlane = new THREE.Mesh(new THREE.PlaneGeometry(35, 35), rippleMat); ripplePlane.rotation.x = -Math.PI/2; ripplePlane.position.y = -5.0; group.add(ripplePlane);
+        
+        return { mesh: group, materials: [bodyMat, beakMat, eyeMat], rippleMat, leftEye, rightEye };
+    }
+
+    const DUCK_COLORS = [0xffd700, 0xff9aa2, 0x81ecec, 0x98ff98, 0xa29bfe];
+    function createRubberDucks() {
+        ducks = [];
+        for(let i = 0; i < MAX_DUCKS; i++) {
+            const isBase = (i === 0); const initialScale = isBase ? 2.4 : 0.3;
+            let parts = createDuckParts(DUCK_COLORS[i % DUCK_COLORS.length], isBase);
+            parts.mesh.scale.setScalar(initialScale); scene.add(parts.mesh);
+            ducks.push({ ...parts, active: isBase, isBase, px: isBase ? 0 : (Math.random() > 0.5 ? 200 : -200), pz: isBase ? -20 : 220, vx: 0, vz: 0, rotY: 0, currentScale: initialScale, targetScale: initialScale, phase: Math.random() * Math.PI * 2, blinkTimer: Math.random() * 200 + 50, blinkState: 0, leaveTime: 0 });
+        }
+    }
+
+    function spawnManualDuck() {
+        const initialScale = 0.6 + Math.random() * 0.4;
+        let parts = createDuckParts(DUCK_COLORS[Math.floor(Math.random() * DUCK_COLORS.length)], false);
+        parts.mesh.scale.setScalar(initialScale); scene.add(parts.mesh);
+        ducks.push({ ...parts, active: true, isBase: false, px: (Math.random() - 0.5) * 150, pz: -280 - Math.random() * 50, vx: 0, vz: 0.5, rotY: 0, currentScale: initialScale, targetScale: initialScale, phase: Math.random() * Math.PI * 2, blinkTimer: Math.random() * 200 + 50, blinkState: 0, leaveTime: Date.now() + 15000 });
+    }
+
+    function createInitialStrata() {
+        const halfWorld = CONFIG.WORLD_WIDTH / 2;
+        for(let i = 0; i < 1500; i++) {
+            const zBias = Math.random();
+            const idx = particleIdx++;
+            positions[idx * 3] = Math.random() * CONFIG.WORLD_WIDTH - halfWorld; 
+            positions[idx * 3 + 1] = -5 - Math.random() * 60; 
+            positions[idx * 3 + 2] = -15 - (zBias * zBias) * (CONFIG.WORLD_DEPTH - 20); 
+            
+            _tempBaseColor.setHex(STRATA_PALETTE[Math.floor(Math.random() * STRATA_PALETTE.length)]);
+            colors[idx * 3] = _tempBaseColor.r; colors[idx * 3 + 1] = _tempBaseColor.g; colors[idx * 3 + 2] = _tempBaseColor.b;
+            active[idx] = 1; settled[idx] = 0.0; life[idx] = 0.5 + Math.random(); 
+        }
+        particleGeometry.attributes.position.needsUpdate = true; particleGeometry.attributes.customColor.needsUpdate = true; particleGeometry.attributes.aSettled.needsUpdate = true; particleGeometry.attributes.aLife.needsUpdate = true;
+    }
+
+    // [4K 최적화 GC 방지] 전역 임시 변수로 색상 객체 재사용
+    function getBlendedColor(r, g, b) {
+        const time = performance.now() * 0.00018; 
+        const idx1 = Math.floor(time) % STRATA_PALETTE.length; const idx2 = (idx1 + 1) % STRATA_PALETTE.length;
+        let mixRatio = time - Math.floor(time);
+        mixRatio = mixRatio < 0.5 ? 2.0 * mixRatio * mixRatio : 1.0 - Math.pow(-2.0 * mixRatio + 2.0, 2.0) / 2.0;
+        
+        _tempBaseColor.setHex(STRATA_PALETTE[idx1]); _tempNextColor.setHex(STRATA_PALETTE[idx2]);
+        _tempBaseColor.lerp(_tempNextColor, mixRatio); 
+        _tempCamColor.setRGB(r / 255, g / 255, b / 255); _tempBaseColor.lerp(_tempCamColor, 0.25);
+        
+        const hsl = {h:0, s:0, l:0}; _tempBaseColor.getHSL(hsl);
+        _tempBaseColor.setHSL((hsl.h + (Math.random()-0.5)*0.08 + 1.0) % 1.0, Math.max(0.2, Math.min(1.0, hsl.s + (Math.random()-0.5)*0.5)), Math.max(0.4, Math.min(0.9, hsl.l + (Math.random()-0.5)*0.3))); 
+        return _tempBaseColor;
+    }
+
+    function processMotion() {
+        const sw = CONFIG.SAMPLE_WIDTH, sh = CONFIG.SAMPLE_HEIGHT;
+        if (isMockMode) {
+            ctx.fillStyle = 'rgba(11,61,54,0.1)'; ctx.fillRect(0, 0, sw, sh); mockAngle += 0.035;
+            ctx.beginPath(); ctx.arc(sw/2 + Math.cos(mockAngle) * 45, sh/2 + Math.sin(mockAngle * 1.5) * 30, 25, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+        } else {
+            if (video.readyState >= 2) { ctx.save(); ctx.translate(sw, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0, sw, sh); ctx.restore(); } else return;
+        }
+
+        const currentFrame = ctx.getImageData(0, 0, sw, sh); const currentData = currentFrame.data;
+        if (!bgData) { bgData = new Float32Array(currentData.length); currentData.forEach((v,i) => bgData[i]=v); }
+
+        if (previousImageData) {
+            const prevData = previousImageData.data; const step = 2; 
+            let motionXSum = 0, motionYSum = 0, motionCount = 0;
+            
+            // [4K 최적화 GC 방지] 배열을 비우기만 하고 객체 할당 최소화
+            let actIdx = 0, presIdx = 0;
+
+            for (let y = 0; y < sh; y += step) {
+                for (let x = 0; x < sw; x += step) {
+                    const i = (y * sw + x) * 4;
+                    bgData[i] += (currentData[i] - bgData[i]) * 0.005; bgData[i+1] += (currentData[i+1] - bgData[i+1]) * 0.005; bgData[i+2] += (currentData[i+2] - bgData[i+2]) * 0.005;
+                    const r = currentData[i], g = currentData[i+1], b = currentData[i+2];
+                    if (Math.abs(r - prevData[i]) + Math.abs(g - prevData[i+1]) + Math.abs(b - prevData[i+2]) > CONFIG.MOTION_THRESHOLD * 3) { 
+                        motionXSum += x; motionYSum += y; motionCount++; 
+                        if(!_activePixels[actIdx]) _activePixels[actIdx] = {};
+                        _activePixels[actIdx].x = x; _activePixels[actIdx].y = y; _activePixels[actIdx].r = r; _activePixels[actIdx].g = g; _activePixels[actIdx].b = b;
+                        actIdx++;
+                    } 
+                    else if (Math.abs(r - bgData[i]) + Math.abs(g - bgData[i+1]) + Math.abs(b - bgData[i+2]) > CONFIG.PRESENCE_THRESHOLD * 3 && Math.random() < 0.02) {
+                        if(!_presencePixels[presIdx]) _presencePixels[presIdx] = {};
+                        _presencePixels[presIdx].x = x; _presencePixels[presIdx].y = y; _presencePixels[presIdx].r = r; _presencePixels[presIdx].g = g; _presencePixels[presIdx].b = b;
+                        presIdx++;
+                    }
+                }
+            }
+            
+            let dynamicSpawnLimit = Math.floor(2 + currentVisualIntensity * 6); 
+            let spawnedThisFrame = 0;
+            
+            if (motionCount > 0) {
+                const centerX = motionXSum / motionCount, centerY = motionYSum / motionCount;
+                globalMotion.x = (centerX / sw - 0.5) * CONFIG.WORLD_WIDTH; globalMotion.y = -(centerY / sh - 0.5) * CONFIG.WORLD_HEIGHT;
+                globalMotion.intensity = Math.min(motionCount / 450, 1.0);
+                
+                // 간단한 셔플 효과
+                for(let i=0; i<actIdx; i++) { let temp = _activePixels[i]; let rIdx = Math.floor(Math.random()*actIdx); _activePixels[i] = _activePixels[rIdx]; _activePixels[rIdx] = temp; }
+
+                let clusIdx = 0;
+                let sampleStep = Math.max(1, Math.floor(actIdx / 200)); 
+                for (let i = 0; i < actIdx; i += sampleStep) {
+                    let p = _activePixels[i]; let matched = false;
+                    for (let c=0; c<clusIdx; c++) {
+                        let cl = _clusters[c];
+                        if (Math.hypot(p.x - cl.x, p.y - cl.y) < 25) { cl.x = (cl.x * cl.count + p.x) / (cl.count + 1); cl.y = (cl.y * cl.count + p.y) / (cl.count + 1); cl.count++; matched = true; break; }
+                    }
+                    if (!matched) { if(!_clusters[clusIdx]) _clusters[clusIdx] = {}; _clusters[clusIdx].x = p.x; _clusters[clusIdx].y = p.y; _clusters[clusIdx].count = 1; clusIdx++; }
+                }
+                
+                let activeClusters = _clusters.slice(0, clusIdx).filter(c => c.count > 5).sort((a,b) => b.count - a.count);
+                let numActiveExtras = Math.min(activeClusters.length, MAX_DUCKS - 1);
+                let now = performance.now();
+                let activeCount = ducks.filter((d, idx) => idx > 0 && d.active).length;
+                let hasSpawnedOrReactivated = false;
+
+                for (let i = 1; i < MAX_DUCKS; i++) {
+                    if (ducks[i]) {
+                        if (i <= numActiveExtras) {
+                            ducks[i].leaveTime = now + 10000; ducks[i].targetScale = 0.6 + Math.min(0.6, activeClusters[i-1].count * 0.005);
+                            if (!ducks[i].active) {
+                                if (ducks[i].currentScale > 0.1) {
+                                    if (!hasSpawnedOrReactivated && now - lastDuckSpawnTime > 1500) { ducks[i].active = true; delete ducks[i].exitDir; lastDuckSpawnTime = now; hasSpawnedOrReactivated = true; }
+                                } else if (!hasSpawnedOrReactivated && activeCount < numActiveExtras && now - lastDuckSpawnTime > DUCK_SPAWN_INTERVAL) {
+                                    ducks[i].active = true; ducks[i].px = (Math.random() - 0.5) * 200; ducks[i].pz = -350 - Math.random() * 50; ducks[i].vx = 0; ducks[i].vz = 0.6; 
+                                    ducks[i].currentScale = ducks[i].targetScale; delete ducks[i].exitDir; lastDuckSpawnTime = now; activeCount++; hasSpawnedOrReactivated = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for(let i=0; i<actIdx; i++) {
+                    if (spawnedThisFrame >= dynamicSpawnLimit) break;
+                    let p = _activePixels[i];
+                    spawnParticle(p.x + (Math.random() - 0.5) * 30, p.y, centerX, p.r, p.g, p.b); 
+                    spawnedThisFrame++;
+                }
+                AudioEngine.updateMotion(globalMotion.intensity); targetBloomStrength = 0.6 + globalMotion.intensity * 0.5; 
+            } else { AudioEngine.updateMotion(0.0); targetBloomStrength = 0.35; } 
+
+            if (spawnedThisFrame < dynamicSpawnLimit) {
+                for(let i=0; i<presIdx; i++) { let temp = _presencePixels[i]; let rIdx = Math.floor(Math.random()*presIdx); _presencePixels[i] = _presencePixels[rIdx]; _presencePixels[rIdx] = temp; }
+                let ambientSpawnCount = 0; 
+                for(let i=0; i<presIdx; i++) {
+                    if (Math.random() < 0.3) {
+                        if (ambientSpawnCount >= 1 || spawnedThisFrame >= dynamicSpawnLimit) break; 
+                        let p = _presencePixels[i];
+                        spawnParticle(p.x, p.y, p.x, p.r, p.g, p.b); 
+                        spawnedThisFrame++; ambientSpawnCount++;
+                    }
+                }
+            }
+        }
+        previousImageData = currentFrame;
+    }
+
+    function spawnParticle(x, y, centerX, r, g, b) {
+        const sw = CONFIG.SAMPLE_WIDTH, sh = CONFIG.SAMPLE_HEIGHT;
+        const px = THREE.MathUtils.lerp((x / sw - 0.5) * CONFIG.WORLD_WIDTH, (centerX / sw - 0.5) * CONFIG.WORLD_WIDTH, 0.62) + (Math.random() - 0.5) * 16; 
+        const py = -25 - Math.random() * 40;
+        const pz = ((y / sh) - 1.0) * (CONFIG.WORLD_DEPTH / 2) - 5 + (Math.random() - 0.5) * 10;
+        
+        const idx = particleIdx; const color = getBlendedColor(r, g, b);
+        positions[idx * 3] = px; positions[idx * 3 + 1] = py; positions[idx * 3 + 2] = pz;
+        colors[idx * 3] = color.r; colors[idx * 3 + 1] = color.g; colors[idx * 3 + 2] = color.b;
+        velocities[idx] = 0; active[idx] = 1; settled[idx] = 0.0; life[idx] = 1.0 + Math.random() * 0.2; pVx[idx] = 0; pVz[idx] = 0;
+        particleIdx = (particleIdx + 1) % CONFIG.MAX_PARTICLES;
+    }
+
+    function spawnRippleExtra(x, y, z, r, g, b) {
+        const idx = particleIdx;
+        positions[idx * 3] = x; positions[idx * 3 + 1] = y; positions[idx * 3 + 2] = z;
+        colors[idx * 3] = r; colors[idx * 3 + 1] = g; colors[idx * 3 + 2] = b;
+        velocities[idx] = 0; active[idx] = 1; settled[idx] = 1.0; life[idx] = 0.3 + Math.random() * 0.4; phase[idx] = Math.random() * Math.PI * 2;
+        pVx[idx] = (Math.random() - 0.5) * 0.6; pVz[idx] = (Math.random() - 0.5) * 0.6;
+        particleIdx = (particleIdx + 1) % CONFIG.MAX_PARTICLES;
+    }
+
+    function spawnDuckFoam(x, y, z, scale, isBase, duckVx, duckVz) {
+        if (Math.random() > 0.93) return; 
+        let count = isBase ? 4 : 2; 
+        for(let i=0; i<count; i++) {
+            const idx = particleIdx; const angle = Math.random() * Math.PI * 2;
+            const r = ((isBase ? 8.0 : 5.0) + Math.random() * (isBase ? 6.0 : 4.0)) * scale; 
+            positions[idx * 3] = x + Math.cos(angle) * r; positions[idx * 3 + 1] = y + (isBase ? 2.0 : 1.5); positions[idx * 3 + 2] = z + Math.sin(angle) * r;
+            colors[idx * 3] = 1.0; colors[idx * 3 + 1] = 1.0; colors[idx * 3 + 2] = 1.0;
+            velocities[idx] = 0; active[idx] = 1; settled[idx] = isBase ? 2.0 : 3.0; life[idx] = 0.4 + Math.random() * 0.4; phase[idx] = Math.random() * Math.PI * 2;
+            let spreadSpeed = (isBase ? 0.2 + Math.random() * 0.3 : 0.05 + Math.random() * 0.15) * scale;
+            pVx[idx] = Math.cos(angle) * spreadSpeed + (duckVx || 0) * (isBase ? 0.3 : 0.1); pVz[idx] = Math.sin(angle) * spreadSpeed + (duckVz || 0) * (isBase ? 0.3 : 0.1);
+            particleIdx = (particleIdx + 1) % CONFIG.MAX_PARTICLES;
+        }
+    }
+
+    let currentSurfaceCount = 0;
+    function updatePhysics() {
+        const timeVal = performance.now() * 0.00035;
+        let posUpdated = false, settledUpdated = false, lifeUpdated = false;
+        const tideZ = Math.sin(timeVal * 1.5) * 0.8; const tideX = Math.cos(timeVal * 1.2) * 0.4;
+        currentSurfaceCount = 0;
+
+        for (let i = 0; i < CONFIG.MAX_PARTICLES; i++) {
+            if (active[i] === 1) {
+                let px = positions[i * 3]; let py = positions[i * 3 + 1]; let pz = positions[i * 3 + 2];
+                let isFar = pz < -20.0;
+                let calmMultiplier = 1.0 + (1.0 - currentVisualIntensity) * 4.0; 
+                let lifeDecay = (isFar ? (0.0002 + Math.random() * 0.0002) : (0.002 + Math.random() * 0.002)) * calmMultiplier;
+                if (settled[i] === 1.0) lifeDecay *= 2.0; else if (settled[i] >= 2.0) lifeDecay *= 1.5; else lifeDecay *= 0.5; 
+                
+                life[i] -= lifeDecay; lifeUpdated = true;
+                if (life[i] <= 0) {
+                    if (Math.random() < (isFar ? 0.95 : 0.01)) {
+                        positions[i * 3] = (Math.random() - 0.5) * CONFIG.WORLD_WIDTH; positions[i * 3 + 1] = -50 - Math.random() * 30; 
+                        positions[i * 3 + 2] = isFar ? -25 - Math.pow(Math.random(), 2) * (CONFIG.WORLD_DEPTH/2 + 10.0) : -15 - Math.random() * 40;
+                        life[i] = 0.8 + Math.random() * 0.4; settled[i] = 0.0;
+                    } else { active[i] = 0; positions[i * 3 + 1] = -9999; }
+                    posUpdated = true; settledUpdated = true; continue;
+                }
+
+                let waveY = Math.sin(px * 0.015 + timeVal * 2.5) * 12 + Math.cos(pz * 0.02 - timeVal * 2.0) * 10 - 5;
+                positions[i * 3] += pVx[i]; positions[i * 3 + 2] += pVz[i]; pVx[i] *= 0.94; pVz[i] *= 0.94;
+                positions[i * 3] += tideX; positions[i * 3 + 2] += tideZ;
+
+                if (globalMotion.intensity > 0.05) {
+                    const dMX = px - globalMotion.x, dMZ = pz - (-globalMotion.y); 
+                    if (Math.abs(dMX) < 65 && Math.abs(dMZ) < 85) {
+                        const angle = Math.atan2(dMZ, dMX); positions[i * 3] += Math.cos(angle) * globalMotion.intensity * 3.0; positions[i * 3 + 2] += Math.sin(angle) * globalMotion.intensity * 3.0;
+                    }
+                }
+
+                if (py < waveY) {
+                    positions[i * 3 + 1] += CONFIG.BUOYANCY + Math.random() * 0.05; positions[i * 3] += Math.sin(py * 0.05 + phase[i]) * 0.2; 
+                    if (settled[i] === 1.0) { settled[i] = 0.0; settledUpdated = true; }
+                } else {
+                    positions[i * 3 + 1] = waveY + Math.sin(timeVal * 1.5 + phase[i]) * 0.5;
+                    if (settled[i] === 0.0) { 
+                        positions[i * 3] += Math.cos(px * 0.02 + timeVal) * 0.3; positions[i * 3 + 2] += Math.sin(pz * 0.02 + timeVal) * 0.3;
+                        if (Math.random() < 0.003) { 
+                            settled[i] = 1.0; settledUpdated = true; 
+                            let exRips = Math.floor(Math.random() * 2) + 1; 
+                            for(let r = 0; r < exRips; r++) spawnRippleExtra(px + (Math.random() - 0.5) * 60.0, py + (Math.random() - 0.5) * 5.0, pz + (Math.random() - 0.5) * 60.0, colors[i*3], colors[i*3+1], colors[i*3+2]);
+                        }
+                    } 
+                    currentSurfaceCount++;
+                }
+                posUpdated = true;
+            }
+        }
+        if (posUpdated) particleGeometry.attributes.position.needsUpdate = true;
+        if (settledUpdated) particleGeometry.attributes.aSettled.needsUpdate = true;
+        if (lifeUpdated) particleGeometry.attributes.aLife.needsUpdate = true;
+        globalMotion.intensity *= 0.9;
+    }
+
+    function updateDucks() {
+        const timeVal = performance.now() * 0.00035; const now = performance.now();
+        for (let i = 0; i < ducks.length; i++) {
+            let d = ducks[i];
+            if (!d.isBase && d.active && now > d.leaveTime) { d.active = false; d.exitDir = (Math.random() > 0.5 ? 1 : -1); }
+
+            let targetX, targetZ;
+            if (d.active) {
+                targetX = Math.sin(timeVal * 0.5 + d.phase) * 40 + (d.isBase ? 0 : Math.cos(d.phase) * 60);
+                targetZ = Math.cos(timeVal * 0.4 + d.phase) * 20 + (d.isBase ? -20 : ducks[0].pz + 50 + Math.sin(d.phase) * 20);
+                let returnForce = d.isBase ? 0.0004 : 0.00008;
+                d.vx += (targetX - d.px) * returnForce; d.vz += (targetZ - d.pz) * returnForce;
+            } else {
+                if (!d.exitDir) d.exitDir = d.px > 0 ? 1 : -1; targetX = d.px + (d.exitDir * 20); targetZ = -350; 
+                d.vx += (targetX - d.px) * 0.0001; d.vz += (targetZ - d.pz) * 0.0004;
+            }
+
+            if (globalMotion.intensity > 0.05) {
+                let dx = d.px - globalMotion.x, dz = d.pz - (-globalMotion.y), dist = Math.hypot(dx, dz);
+                if (dist > 0.001 && dist < 120) { let force = (120 - dist) / 120 * globalMotion.intensity; let massMultiplier = d.isBase ? 0.02 : 0.35; d.vx += (dx / dist) * force * 5.0 * massMultiplier; d.vz += (dz / dist) * force * 5.0 * massMultiplier; }
+            }
+
+            for (let j = 0; j < ducks.length; j++) {
+                if (i === j) continue; let d2 = ducks[j];
+                if ((!d.active && d.currentScale < 0.1) || (!d2.active && d2.currentScale < 0.1)) continue; 
+                let dx = d.px - d2.px, dz = d.pz - d2.pz, dist = Math.hypot(dx, dz), minDist = (d.currentScale + d2.currentScale) * 12.0; 
+                if (dist > 0.001 && dist < minDist) { let pushForce = (minDist - dist) * 0.04; let massRatio = d2.isBase ? 0.95 : (d.isBase ? 0.05 : 0.5); d.vx += (dx / dist) * pushForce * massRatio; d.vz += (dz / dist) * pushForce * massRatio; }
+            }
+
+            d.vx *= 0.955; d.vz *= 0.955; if (isNaN(d.vx)) d.vx = 0; if (isNaN(d.vz)) d.vz = 0;
+            d.px += d.vx; d.pz += d.vz;
+
+            const waveY = Math.sin(d.px * 0.015 + timeVal * 2.5) * 12 + Math.cos(d.pz * 0.02 - timeVal * 2.0) * 10 - 5;
+            let fadeAlpha = THREE.MathUtils.clamp((d.pz - (-260)) / 160.0, 0.0, 1.0);
+            
+            d.materials.forEach(mat => { mat.opacity = fadeAlpha; if (mat.userData && mat.userData.waterLevel) { mat.userData.waterLevel.value = waveY; mat.userData.duckScale.value = d.currentScale; } });
+            if (d.rippleMat) { d.rippleMat.uniforms.time.value = timeVal; d.rippleMat.uniforms.uOpacity.value = fadeAlpha; }
+
+            if (!d.isBase && (d.pz < -260 || Math.abs(d.px) > 350)) { d.active = false; d.currentScale = 0; d.targetScale = 0; d.px = 9999; }
+            if (!d.isBase && d.currentScale > 0) { d.currentScale += (d.targetScale - d.currentScale) * 0.035; d.mesh.scale.setScalar(Math.max(0.001, d.currentScale)); }
+
+            const yOffset = d.isBase ? 15 : (d.currentScale * 6.25 + 3.0);
+            const bobbing = Math.sin(timeVal * 1.5 + d.phase) * (d.isBase ? 4 : 2);
+            d.mesh.position.set(d.px, waveY + yOffset + bobbing, d.pz);
+            if (d.currentScale > 0.1 && d.pz > -260) spawnDuckFoam(d.px, waveY + yOffset + bobbing - (d.currentScale * 5.0), d.pz, d.currentScale, d.isBase, d.vx, d.vz);
+
+            let targetRotY = Math.hypot(d.vx, d.vz) < 0.2 ? Math.sin(timeVal * 0.5 + d.phase) * 0.5 : Math.atan2(d.vx, d.vz) + Math.PI;
+            d.rotY = d.rotY || 0; let diff = targetRotY - d.rotY; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); d.rotY += diff * 0.05;
+            d.mesh.rotation.set(Math.sin(timeVal * 2.0 + d.phase) * 0.1, d.rotY, Math.cos(timeVal * 2.2 + d.phase) * 0.1);
+
+            if (d.blinkTimer > 0) { d.blinkTimer--; } 
+            else if (d.blinkState === 0) { d.blinkState = 1; d.blinkTimer = Math.random() > 0.7 ? 15 : Math.random() * 200 + 100; }
+            if (d.blinkState === 1) { d.leftEye.scale.y -= 0.3; d.rightEye.scale.y -= 0.3; if (d.leftEye.scale.y <= 0.1) d.blinkState = 2; } 
+            else if (d.blinkState === 2) { d.leftEye.scale.y += 0.3; d.rightEye.scale.y += 0.3; if (d.leftEye.scale.y >= 1.0) { d.leftEye.scale.y = 1.0; d.rightEye.scale.y = 1.0; d.blinkState = 0; } }
+        }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        // [4K 최적화 GC 방지] Date.now() 대신 performance.now() 사용
+        const timeUniform = performance.now() * 0.001;
+        const pendulum = Math.sin(timeUniform * 0.8) * 0.5 + 0.5;
+        currentVisualIntensity = Math.min(1.0, pendulum + globalMotion.intensity * 2.5);
+
+        if(fgWaveMat1) fgWaveMat1.uniforms.time.value = timeUniform;
+        if(fgWaveMat2) fgWaveMat2.uniforms.time.value = timeUniform;
+        if(videoMat) videoMat.uniforms.time.value += 0.025; 
+        if(particleMaterial) {
+            particleMaterial.uniforms.time.value += 0.015; 
+            particleMaterial.uniforms.uIntensity.value = currentVisualIntensity;
+            particleMaterial.uniforms.uScale.value = (window.innerHeight * RENDER_SCALE) / 1080.0;
+        }
+        if(bloomPass) bloomPass.strength += (targetBloomStrength - bloomPass.strength) * 0.05;
+
+        // [최적화] CPU 스로틀링: 30FPS 제한 (모션 스캔)
+        const nowMs = performance.now();
+        if (nowMs - lastProcessMotionTime > 33) { processMotion(); lastProcessMotionTime = nowMs; }
+        
+        updatePhysics();
+        AudioEngine.updateAmbience(currentSurfaceCount); AudioEngine.tick(currentSurfaceCount);
+
+        const time = performance.now() * 0.000085;
+        const rotationY = Math.sin(time) * 0.15; 
+        camera.position.x = Math.sin(time * 0.4) * 28; camera.lookAt(0, -18, 0);
+
+        if(particleSystem) particleSystem.rotation.y = rotationY;
+        if(videoPlane) videoPlane.rotation.y = rotationY;
+
+        updateDucks();
+        composer.render();
+    }
+
+    function onWindowResize() {
+        if (!camera || !renderer || !composer) return;
+        camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+        
+        // [4K 최적화] RENDER_SCALE로 크기 조정 및 CSS 크기 고정 방지 (false 전달)
+        const renderW = window.innerWidth * RENDER_SCALE;
+        const renderH = window.innerHeight * RENDER_SCALE;
+        renderer.setSize(renderW, renderH, false); 
+        composer.setSize(renderW, renderH);
+        
+        if(bloomPass) bloomPass.resolution.set(renderW / 4, renderH / 4);
+    }
+</script>
+</body>
+</html>
