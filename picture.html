@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Magical Elastic Strata - Room Illusion</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Serif+KR:wght@200;300;400&display=swap" rel="stylesheet">
+
+    <!-- Three.js 및 Post-processing 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FilmShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/FilmPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/RGBShiftShader.js"></script>
+
+    <!-- GSAP for UI Animation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            background-color: #010102; 
+            font-family: 'Cinzel', 'Noto Serif KR', serif;
+            transition: cursor 0.3s;
+            color: #EBE9E4;
+        }
+
+        body.hide-cursor { cursor: none; }
+
+        #webgl-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+
+        /* 갤러리 벽면 프레임 효과 (참조 이미지처럼 가장자리를 하얗게 덮어 큐브 안쪽 느낌 강조) */
+        #gallery-frame {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 5;
+            box-sizing: border-box;
+            border: 4vw solid #f0f0f2; /* 화이트 갤러리 프레임 */
+            box-shadow: inset 0 0 40px rgba(0, 0, 20, 0.8), inset 0 0 100px rgba(0,0,0,0.6);
+        }
+
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; justify-content: center; align-items: center; z-index: 25;
+            background: rgba(1, 1, 2, 0.85); backdrop-filter: blur(15px);
+        }
+
+        .message { font-size: 1.1rem; font-weight: 300; letter-spacing: 0.15em; text-align: center; color: #a19d92; text-transform: uppercase; }
+
+        #helper-text {
+            position: absolute; bottom: 30px; right: 40px; font-size: 0.8rem;
+            color: rgba(216, 211, 197, 0.4); z-index: 15; letter-spacing: 0.2em;
+            pointer-events: none; opacity: 0; transition: opacity 0.5s; text-transform: uppercase;
+        }
+
+        #audio-helper {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 0.9rem; font-weight: 400; color: #ffffff;
+            z-index: 20; letter-spacing: 0.3em; pointer-events: none; text-transform: uppercase;
+            animation: breatheUI 3s infinite ease-in-out;
+            background: rgba(0, 0, 0, 0.6); padding: 20px 45px;
+            border: 1px solid rgba(255, 255, 255, 0.15); backdrop-filter: blur(12px);
+            border-radius: 4px;
+        }
+
+        @keyframes breatheUI {
+            0% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.98); box-shadow: 0 0 0px rgba(255,255,255,0); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.02); box-shadow: 0 0 25px rgba(255,255,255,0.15); }
+            100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.98); box-shadow: 0 0 0px rgba(255,255,255,0); }
+        }
+
+        #settings-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 30;
+            background: rgba(1, 1, 2, 0.8); backdrop-filter: blur(12px);
+            opacity: 0; pointer-events: none; transition: opacity 0.5s;
+        }
+        #settings-layer.active { opacity: 1; pointer-events: auto; }
+        
+        .settings-box {
+            background: rgba(15, 15, 20, 0.9); border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px 50px; border-radius: 12px; text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        }
+        .settings-title { font-size: 1.5rem; letter-spacing: 0.2em; margin-bottom: 30px; color: #ffffff; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; width: 380px; margin-bottom: 25px; }
+        .setting-label { font-size: 0.95rem; letter-spacing: 0.1em; color: #EBE9E4; width: 160px; text-align: left; }
+        .toggle-btn {
+            background: transparent; border: 1px solid #EBE9E4; color: #EBE9E4;
+            padding: 8px 24px; font-family: 'Cinzel', serif; cursor: pointer; transition: 0.3s;
+            letter-spacing: 0.1em; font-size: 1rem; border-radius: 4px; width: 150px;
+        }
+        .toggle-btn:hover { background: #EBE9E4; color: #030305; }
+
+        .setting-slider { width: 150px; -webkit-appearance: none; background: transparent; outline: none; }
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+            background: #EBE9E4; cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        .setting-slider::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 2px;
+        }
+
+        #sample-canvas, #webcam-video { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- 참조 이미지 느낌을 내기 위한 갤러리 프레임 -->
+    <div id="gallery-frame"></div>
+
+    <canvas id="webgl-canvas"></canvas>
+
+    <video id="webcam-video" autoplay playsinline muted></video>
+    <canvas id="sample-canvas"></canvas>
+    
+    <div id="ui-layer">
+        <p class="message" id="error-msg">마법의 방이 닫혀있어 가상의 데이터로 대체됩니다.</p>
+    </div>
+
+    <!-- 설정 패널 UI -->
+    <div id="settings-layer">
+        <div class="settings-box">
+            <div class="settings-title">CUBE INSTALLATION</div>
+            <div class="setting-row">
+                <span class="setting-label">AUDIO</span>
+                <button id="sound-toggle-btn" class="toggle-btn">ON</button>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">ROOM DEPTH</span>
+                <input type="range" id="base-depth-slider" class="setting-slider" min="100" max="600" value="280">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">INTERACTION DEPTH</span>
+                <input type="range" id="depth-slider" class="setting-slider" min="100" max="600" value="350">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">BLOOM / GLOW</span>
+                <input type="range" id="bloom-slider" class="setting-slider" min="0.0" max="1.5" step="0.1" value="0.3">
+            </div>
+        </div>
+    </div>
+
+    <div id="helper-text">[ESC] Configure</div>
+    <div id="audio-helper">Enter The Void</div>
+
+<script>
+    const CONFIG = {
+        GRID_SIZE: 128,         
+        PLANE_SEGMENTS: 300,    // 부드러운 방 모서리를 위해 세분화 증가
+        PRESENCE_THRESHOLD: 20, 
+        SPRING_K: 0.05,         
+        DAMPING: 0.85,          
+        BASE_ROOM_DEPTH: 280.0, // 고정된 방(큐브)의 기본 깊이
+        ROOM_MARGIN: 0.18,      // 측면/천장/바닥 벽이 차지하는 비율 (0.0 ~ 0.5)
+        MAX_DEPTH: 350.0,       // 유저 감지시 추가로 밀려나는 깊이
+        BASE_BLOOM: 0.3
+    };
+
+    let scene, camera, renderer, composer, bloomPass, rgbShiftPass;
+    let elasticPlane, customMaterial;
+    let targetBloomStrength = 0.3; 
+    
+    let depthData, velocityData, targetDepthData;
+    let depthTexture;
+
+    // --- 추가된 동적 색상 및 방 깊이 제어 변수 ---
+    let currentColor1 = new THREE.Color(0.88, 0.17, 0.15);
+    let currentColor2 = new THREE.Color(0.00, 0.47, 0.75);
+    let targetColor1 = new THREE.Color(0.88, 0.17, 0.15);
+    let targetColor2 = new THREE.Color(0.00, 0.47, 0.75);
+    let currentRoomDepth = 0.0; // 시작 시 평면 상태
+
+    const video = document.getElementById('webcam-video');
+    const sampleCanvas = document.getElementById('sample-canvas');
+    const ctx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+    
+    let previousImageData = null;
+    let bgData = null; 
+    let globalMotion = { x: 0, y: 0, uvX: 0.5, uvY: 0.5, intensity: 0 };
+    let isMockMode = false, mockAngle = 0, isUIHidden = true; 
+    let lastMotionTime = Date.now();
+
+    const AudioEngine = {
+        ctx: null, convolver: null, masterGain: null, compressor: null,
+        delay: null, feedback: null, padGain: null, padFilter: null,
+        isInitialized: false, isMuted: false,
+        
+        // 일렉트로닉 시퀀싱을 위한 변수
+        bpm: 110,
+        nextNoteTime: 0,
+        step: 0,
+        // C Minor Pentatonic Scale (트렌디하고 몽환적인 일렉 사운드에 적합)
+        scale: [130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13, 349.23, 392.00, 466.16],
+
+        toggleMute: function() {
+            this.isMuted = !this.isMuted;
+            if (this.isInitialized && this.masterGain) {
+                this.masterGain.gain.setTargetAtTime(this.isMuted ? 0.0 : 0.65, this.ctx.currentTime, 0.05);
+            }
+            return this.isMuted;
+        },
+
+        init: function() {
+            if (this.isInitialized) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioContext();
+            
+            // 시끄럽지 않게 눌러주는 마스터 컴프레서
+            this.compressor = this.ctx.createDynamicsCompressor();
+            this.compressor.threshold.value = -24;
+            this.compressor.knee.value = 30;
+            this.compressor.ratio.value = 12;
+            this.compressor.attack.value = 0.003;
+            this.compressor.release.value = 0.25;
+            this.compressor.connect(this.ctx.destination);
+
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = this.isMuted ? 0.0 : 0.65;
+            this.masterGain.connect(this.compressor);
+            
+            // 리버브 (공간감)
+            this.convolver = this.ctx.createConvolver();
+            const length = this.ctx.sampleRate * 3.0; 
+            const impulse = this.ctx.createBuffer(2, length, this.ctx.sampleRate);
+            for (let i = 0; i < 2; i++) {
+                const channel = impulse.getChannelData(i);
+                for (let j = 0; j < length; j++) channel[j] = (Math.random() * 2 - 1) * Math.exp(-j / (this.ctx.sampleRate * 1.0));
+            }
+            this.convolver.buffer = impulse;
+            this.convolver.connect(this.masterGain);
+
+            // 트렌디한 일렉 사운드의 핵심: 점8분음표 핑퐁 딜레이
+            this.delay = this.ctx.createDelay();
+            this.delay.delayTime.value = (60.0 / this.bpm) * 0.75; 
+            this.feedback = this.ctx.createGain();
+            this.feedback.gain.value = 0.4; // 메아리 길이
+            this.delay.connect(this.feedback);
+            this.feedback.connect(this.delay);
+            this.delay.connect(this.masterGain);
+            this.delay.connect(this.convolver); // 딜레이된 소리에도 리버브 적용
+            
+            this.startAmbientPad();
+            this.nextNoteTime = this.ctx.currentTime + 0.1;
+            this.isInitialized = true;
+        },
+        
+        startAmbientPad: function() {
+            this.padGain = this.ctx.createGain();
+            this.padGain.gain.value = 0.05;
+            
+            // 방이 깊어질 때 서서히 열리는 필터
+            this.padFilter = this.ctx.createBiquadFilter();
+            this.padFilter.type = 'lowpass';
+            this.padFilter.frequency.value = 150;
+            
+            this.padFilter.connect(this.padGain);
+            this.padGain.connect(this.convolver);
+            this.padGain.connect(this.masterGain);
+
+            // 몽환적인 베이스 화음 (C, G, Bb)
+            [65.41, 98.00, 116.54].forEach(f => {
+                let osc = this.ctx.createOscillator();
+                osc.type = 'sawtooth';
+                osc.frequency.value = f;
+                osc.connect(this.padFilter);
+                osc.start();
+            });
+        },
+
+        // 매 프레임마다 호출되어 시퀀싱 및 모듈레이션 처리
+        tick: function(motionIntensity, roomDepth) {
+            if (!this.isInitialized) return;
+
+            // 16분음표 단위의 제너러티브 시퀀서
+            while (this.nextNoteTime < this.ctx.currentTime + 0.1) {
+                this.scheduleStep(this.step, this.nextNoteTime, motionIntensity, roomDepth);
+                this.nextNoteTime += 0.25 * (60.0 / this.bpm); 
+                this.step = (this.step + 1) % 16;
+            }
+
+            const now = this.ctx.currentTime;
+            const normalizedDepth = Math.min(Math.max(roomDepth / 350.0, 0), 1.0);
+            
+            // 움직임과 방의 깊이에 따라 배경 패드 사운드의 필터와 볼륨 조절 (공간감 극대화)
+            const targetFilterFreq = 150 + (normalizedDepth * 1200) + (motionIntensity * 2000);
+            this.padFilter.frequency.setTargetAtTime(targetFilterFreq, now, 0.3);
+            this.padGain.gain.setTargetAtTime(0.05 + normalizedDepth * 0.1, now, 0.5);
+        },
+
+        scheduleStep: function(step, time, motionIntensity, roomDepth) {
+            // 정박자(1, 3박)에 부드럽고 깊은 서브 베이스 펄스 (쿵- 쿵-)
+            if (step % 8 === 0) {
+                this.playSubBass(time, 0.5 + motionIntensity * 0.3);
+            }
+
+            // 움직임이 많을수록 전자음(Pluck)이 발생할 확률 증가
+            let prob = motionIntensity * 1.8 + (roomDepth > 100 ? 0.15 : 0.02);
+            if (Math.random() < prob) {
+                let note = this.scale[Math.floor(Math.random() * this.scale.length)];
+                let isAccent = Math.random() < 0.3; // 가끔 강하게 쳐주는 노트
+                this.playPluck(note, time, (0.08 + motionIntensity * 0.15) * (isAccent ? 1.5 : 1.0));
+            }
+        },
+
+        playSubBass: function(time, velocity) {
+            let osc = this.ctx.createOscillator();
+            let env = this.ctx.createGain();
+            let filter = this.ctx.createBiquadFilter();
+
+            osc.type = 'sine';
+            osc.frequency.value = 65.41; // C2
+
+            filter.type = 'lowpass';
+            filter.frequency.value = 120;
+
+            env.gain.setValueAtTime(0, time);
+            env.gain.linearRampToValueAtTime(velocity * 0.6, time + 0.1); // 부드러운 어택
+            env.gain.exponentialRampToValueAtTime(0.001, time + 1.2);     // 긴 릴리즈
+
+            osc.connect(filter);
+            filter.connect(env);
+            env.connect(this.masterGain);
+
+            osc.start(time);
+            osc.stop(time + 1.5);
+        },
+
+        playPluck: function(freq, time, velocity) {
+            let osc = this.ctx.createOscillator();
+            let env = this.ctx.createGain();
+            let filter = this.ctx.createBiquadFilter();
+
+            // 아날로그 신디사이저 느낌의 파형 섞기
+            osc.type = Math.random() < 0.5 ? 'triangle' : 'square';
+            osc.frequency.value = freq;
+
+            filter.type = 'lowpass';
+            // 통통 튀는 전자음을 위한 필터 엔벨롭
+            filter.frequency.setValueAtTime(300 + velocity * 4000, time);
+            filter.exponentialRampToValueAtTime(150, time + 0.2);
+
+            env.gain.setValueAtTime(0, time);
+            env.gain.linearRampToValueAtTime(velocity, time + 0.01); // 짧고 날카로운 어택
+            env.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+
+            osc.connect(filter);
+            filter.connect(env);
+            
+            // 소리를 마스터, 리버브, 딜레이 3곳으로 보내어 입체감 부여
+            env.connect(this.masterGain);
+            env.connect(this.convolver);
+            env.connect(this.delay);
+
+            osc.start(time);
+            osc.stop(time + 0.4);
+        }
+    };
+
+    window.addEventListener('load', startExperience);
+    document.addEventListener('keydown', handleKeyDown);
+    
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('#settings-layer')) return; 
+        if (!AudioEngine.isInitialized) {
+            AudioEngine.init();
+            gsap.to('#audio-helper', { opacity: 0, duration: 1.5, onComplete: () => {
+                document.getElementById('audio-helper').style.display = 'none';
+            } });
+        }
+    });
+
+    document.getElementById('sound-toggle-btn').addEventListener('click', (e) => {
+        const isMuted = AudioEngine.toggleMute();
+        e.target.innerText = isMuted ? 'OFF' : 'ON';
+    });
+    document.getElementById('base-depth-slider').addEventListener('input', (e) => { 
+        CONFIG.BASE_ROOM_DEPTH = parseFloat(e.target.value); 
+        if(customMaterial) customMaterial.uniforms.baseDepthMax.value = CONFIG.BASE_ROOM_DEPTH;
+    });
+    document.getElementById('depth-slider').addEventListener('input', (e) => { CONFIG.MAX_DEPTH = parseFloat(e.target.value); });
+    document.getElementById('bloom-slider').addEventListener('input', (e) => {
+        CONFIG.BASE_BLOOM = parseFloat(e.target.value);
+        if (globalMotion.intensity <= 0.05) targetBloomStrength = CONFIG.BASE_BLOOM;
+    });
+
+    function startExperience() {
+        initWebcam().then(() => {
+            enterExhibitionMode();
+            initThree();
+            animate();
+        }).catch((err) => {
+            isMockMode = true;
+            document.getElementById('ui-layer').style.display = 'flex';
+            setTimeout(() => {
+                gsap.to('#ui-layer', {opacity: 0, duration: 1.5, onComplete: () => {
+                    document.getElementById('ui-layer').style.display = 'none';
+                }});
+                enterExhibitionMode();
+                initThree();
+                animate();
+            }, 3000);
+        });
+    }
+
+    function enterExhibitionMode() {
+        document.body.classList.add('hide-cursor');
+        gsap.to('#helper-text', { opacity: 0, duration: 1, delay: 2 }); 
+        isUIHidden = true;
+        document.getElementById('settings-layer').classList.remove('active');
+    }
+
+    function handleKeyDown(e) {
+        if (e.key === 'Escape') {
+            isUIHidden = !isUIHidden;
+            const settingsLayer = document.getElementById('settings-layer');
+            if (isUIHidden) {
+                document.body.classList.add('hide-cursor');
+                gsap.to('#helper-text', { opacity: 0, duration: 0.5 });
+                settingsLayer.classList.remove('active');
+            } else {
+                document.body.classList.remove('hide-cursor');
+                gsap.to('#helper-text', { opacity: 1, duration: 0.5 });
+                settingsLayer.classList.add('active');
+            }
+        }
+    }
+
+    function initWebcam() {
+        return new Promise((resolve, reject) => {
+            sampleCanvas.width = CONFIG.GRID_SIZE; sampleCanvas.height = CONFIG.GRID_SIZE;
+            navigator.mediaDevices.getUserMedia({ 
+                video: { width: CONFIG.GRID_SIZE, height: CONFIG.GRID_SIZE, facingMode: "user" } 
+            }).then((stream) => {
+                video.srcObject = stream;
+                video.onloadedmetadata = () => { video.play(); resolve(); };
+            }).catch(reject);
+        });
+    }
+
+    function initThree() {
+        const canvas = document.getElementById('webgl-canvas');
+        scene = new THREE.Scene();
+        // 짙은 심연의 블루/블랙 배경
+        scene.background = new THREE.Color(0x010205); 
+        
+        camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 3000);
+        camera.position.set(0, 0, 100); 
+
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const totalNodes = CONFIG.GRID_SIZE * CONFIG.GRID_SIZE;
+        depthData = new Float32Array(totalNodes);
+        velocityData = new Float32Array(totalNodes);
+        targetDepthData = new Float32Array(totalNodes);
+        
+        const texData = new Float32Array(totalNodes * 4);
+        depthTexture = new THREE.DataTexture(texData, CONFIG.GRID_SIZE, CONFIG.GRID_SIZE, THREE.RGBAFormat, THREE.FloatType);
+        depthTexture.minFilter = THREE.LinearFilter;
+        depthTexture.magFilter = THREE.LinearFilter;
+        depthTexture.needsUpdate = true;
+
+        // 크기는 1x1로 생성 후 리사이즈 이벤트에서 화면 절두체(Frustum)에 꽉 차게 스케일 조정됨
+        const planeGeo = new THREE.PlaneGeometry(1, 1, CONFIG.PLANE_SEGMENTS, CONFIG.PLANE_SEGMENTS);
+        
+        customMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                tDepth: { value: depthTexture },
+                time: { value: 0.0 },
+                baseDepthMax: { value: 0.0 }, // currentRoomDepth를 통해 동적으로 변화
+                wallMargin: { value: CONFIG.ROOM_MARGIN },
+                uColor1: { value: currentColor1 },
+                uColor2: { value: currentColor2 }
+            },
+            vertexShader: `
+                uniform sampler2D tDepth;
+                uniform float baseDepthMax;
+                uniform float wallMargin;
+                
+                varying float vDepth;
+                varying vec2 vUv;
+                varying float vBoxRamp; // 모서리 음영 처리를 위해 Fragment로 전달
+                
+                void main() {
+                    vUv = uv;
+                    vec4 texel = texture2D(tDepth, uv);
+                    float interactiveDepth = texel.r;
+                    
+                    // --- 안쪽으로 파고드는 방(CUBE) 형태 생성 로직 ---
+                    // 화면 가장자리(UV 0.0 및 1.0)는 Z=0에 고정시키고, 
+                    // 지정된 margin(예: 18%)을 지나면 Z가 baseDepthMax까지 밀려남
+                    
+                    float rampX = clamp(min(vUv.x, 1.0 - vUv.x) / wallMargin, 0.0, 1.0);
+                    float rampY = clamp(min(vUv.y, 1.0 - vUv.y) / wallMargin, 0.0, 1.0);
+                    
+                    // min()을 사용하여 각진 큐브의 모서리(대각선) 생성
+                    float boxRamp = min(rampX, rampY);
+                    
+                    // 안쪽 모서리가 너무 날카롭지 않게 살짝 부드럽게 스무딩
+                    boxRamp = smoothstep(0.0, 1.0, boxRamp);
+                    vBoxRamp = boxRamp; 
+                    
+                    // 큐브 형태의 기본 깊이
+                    float currentBaseDepth = boxRamp * baseDepthMax;
+                    
+                    // 웹캠에 의한 움직임(interactiveDepth)은 가장자리를 뚫고 나오지 않도록 boxRamp 곱해줌
+                    float finalDepth = currentBaseDepth + (interactiveDepth * boxRamp);
+                    
+                    vec3 pos = position;
+                    pos.z -= finalDepth; // 뒤로 쑥 밀려남
+                    
+                    vDepth = finalDepth;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                varying float vDepth;
+                varying vec2 vUv;
+                varying float vBoxRamp;
+                uniform vec3 uColor1;
+                uniform vec3 uColor2;
+
+                // 웹캠에서 추출한 동적 색상(uColor1, uColor2)을 활용한 팔레트
+                vec3 getPalette(float idx) {
+                    int i = int(mod(idx, 6.0));
+                    if(i == 0) return uColor1;
+                    if(i == 1) return vec3(0.02, 0.02, 0.04); // 어두운 틈 (깊이감 부여)
+                    if(i == 2) return uColor2;
+                    if(i == 3) return vec3(0.02, 0.02, 0.04); // 어두운 틈
+                    if(i == 4) return mix(uColor1, vec3(1.0), 0.4); // 밝은 톤 포인트
+                    return vec3(0.85, 0.85, 0.85); // 소프트 화이트 라인
+                }
+
+                void main() {
+                    float numStripes = 180.0;
+                    
+                    // 큐브 형태로 접혀있기 때문에, vUv.y 방향 줄무늬는 자연스럽게 천장->뒷벽->바닥을 흐릅니다.
+                    float stripeCoord = vUv.y * numStripes + time * 0.5;
+                    float stripeIndex = floor(stripeCoord);
+                    float colorHash = floor(mod(stripeIndex * 3.7 + floor(stripeIndex / 2.0) * 1.3, 9.0));
+                    vec3 baseColor = getPalette(colorHash);
+
+                    float edge = fract(stripeCoord);
+                    float lineMask = smoothstep(0.0, 0.05, edge) * smoothstep(1.0, 0.95, edge);
+                    
+                    // --- 깊이감(Depth) & 안개(Fog) 효과 강화 ---
+                    // 깊어질수록 짙은 푸른빛 안개에 휩싸여 어두워짐
+                    float ao = exp(-vDepth * 0.0055); 
+                    
+                    // 방의 모서리(vBoxRamp가 꺾이는 부분)에 인공적인 앰비언트 오클루전(그림자) 추가
+                    float cornerShadow = smoothstep(0.0, 0.3, vBoxRamp) * smoothstep(1.0, 0.7, vBoxRamp);
+                    ao *= (1.0 - cornerShadow * 0.4);
+
+                    // 짙은 심연의 블루 포그 컬러 (참조 이미지 Vibe)
+                    vec3 fogColor = vec3(0.00, 0.04, 0.12); 
+                    
+                    vec3 finalColor = mix(fogColor, baseColor * lineMask, ao);
+                    float breath = sin(time * 2.0 + stripeIndex * 0.1) * 0.05 + 0.95;
+
+                    gl_FragColor = vec4(finalColor * breath, 1.0);
+                }
+            `,
+            side: THREE.DoubleSide,
+            wireframe: false
+        });
+
+        elasticPlane = new THREE.Mesh(planeGeo, customMaterial);
+        scene.add(elasticPlane);
+
+        const renderScene = new THREE.RenderPass(scene, camera);
+        bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.5, 0.45);
+        
+        rgbShiftPass = new THREE.ShaderPass(THREE.RGBShiftShader);
+        rgbShiftPass.uniforms['amount'].value = 0.001;
+        
+        const filmPass = new THREE.FilmPass(0.2, 0.0, 0, false); 
+
+        composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene); 
+        composer.addPass(bloomPass); 
+        composer.addPass(rgbShiftPass);
+        composer.addPass(filmPass);
+
+        window.addEventListener('resize', onWindowResize, false);
+        onWindowResize(); // 초기 크기 강제 설정
+    }
+
+    function processMotion() {
+        const res = CONFIG.GRID_SIZE;
+        if (isMockMode) {
+            ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(0, 0, res, res); 
+            mockAngle += 0.04;
+            const mx = res/2 + Math.cos(mockAngle) * 30; const my = res/2 + Math.sin(mockAngle * 1.5) * 20;
+            ctx.beginPath(); ctx.arc(mx, my, 25, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+        } else {
+            if (video.readyState >= 2) { 
+                ctx.save(); ctx.translate(res, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0, res, res); ctx.restore();
+            } else return;
+        }
+
+        const currentFrame = ctx.getImageData(0, 0, res, res); 
+        const currentData = currentFrame.data;
+        if (!bgData) { 
+            bgData = new Float32Array(currentData.length); 
+            for(let i=0; i<currentData.length; i++) bgData[i] = currentData[i]; 
+        }
+
+        let totalDepth = 0;
+        let motionCount = 0;
+        let rSum = 0, gSum = 0, bSum = 0, colorCount = 0;
+
+        for (let y = 0; y < res; y++) {
+            for (let x = 0; x < res; x++) {
+                const i = (y * res + x) * 4;
+                const idx = y * res + x;
+                
+                bgData[i] += (currentData[i] - bgData[i]) * 0.003; 
+                bgData[i+1] += (currentData[i+1] - bgData[i+1]) * 0.003; 
+                bgData[i+2] += (currentData[i+2] - bgData[i+2]) * 0.003;
+
+                const diff = Math.abs(currentData[i] - bgData[i]) + Math.abs(currentData[i+1] - bgData[i+1]) + Math.abs(currentData[i+2] - bgData[i+2]);
+                
+                if (diff > CONFIG.PRESENCE_THRESHOLD * 3) {
+                    targetDepthData[idx] = CONFIG.MAX_DEPTH;
+                    motionCount++;
+                    lastMotionTime = Date.now();
+                    
+                    // 움직이는 영역의 색상 추출
+                    rSum += currentData[i];
+                    gSum += currentData[i+1];
+                    bSum += currentData[i+2];
+                    colorCount++;
+                } else {
+                    targetDepthData[idx] = 0.0;
+                }
+                
+                if (previousImageData) {
+                    const prevData = previousImageData.data;
+                    const motionDiff = Math.abs(currentData[i] - prevData[i]) + Math.abs(currentData[i+1] - prevData[i+1]) + Math.abs(currentData[i+2] - prevData[i+2]);
+                    if(motionDiff > 50) {
+                        motionCount++;
+                        rSum += currentData[i];
+                        gSum += currentData[i+1];
+                        bSum += currentData[i+2];
+                        colorCount++;
+                    }
+                }
+            }
+        }
+        
+        // --- 동적 색상 타겟 업데이트 ---
+        if (isMockMode) {
+            let timeVal = Date.now() * 0.001;
+            targetColor1.setHSL((timeVal * 0.1) % 1.0, 0.8, 0.6);
+            targetColor2.setHSL((timeVal * 0.1 + 0.5) % 1.0, 0.8, 0.6);
+        } else if (colorCount > 50) {
+            let r = rSum / colorCount / 255;
+            let g = gSum / colorCount / 255;
+            let b = bSum / colorCount / 255;
+            targetColor1.setRGB(r, g, b);
+            
+            let hsl = {};
+            targetColor1.getHSL(hsl);
+            // 너무 어둡거나 칙칙하지 않게 보정 (비비드한 화풍 유지)
+            let s = Math.max(0.6, hsl.s);
+            let l = Math.max(0.4, Math.min(0.7, hsl.l));
+            targetColor1.setHSL(hsl.h, s, l);
+            
+            // 두 번째 색상은 보색(Complementary)으로 설정하여 대비 강조
+            targetColor2.setHSL((hsl.h + 0.5) % 1.0, s * 0.8, l * 0.9);
+        }
+
+        applyBlur(targetDepthData, res);
+
+        globalMotion.intensity = Math.min(motionCount / (res * res * 0.3), 1.0);
+        targetBloomStrength = CONFIG.BASE_BLOOM + globalMotion.intensity * 0.5;
+
+        let idleTime = Date.now() - lastMotionTime;
+        if (idleTime > 4000 && !isMockMode) {
+            let timeVal = Date.now() * 0.002;
+            let cx = Math.floor(res/2 + Math.sin(timeVal*0.5) * 20);
+            let cy = Math.floor(res/2 + Math.cos(timeVal*0.4) * 20);
+            for(let y = -15; y <= 15; y++) {
+                for(let x = -15; x <= 15; x++) {
+                    if(cx+x >=0 && cx+x < res && cy+y >=0 && cy+y < res) {
+                        let dist = Math.sqrt(x*x + y*y);
+                        if(dist < 15) targetDepthData[(cy+y)*res + (cx+x)] += (15-dist) * 10;
+                    }
+                }
+            }
+        }
+
+        previousImageData = currentFrame;
+    }
+
+    function applyBlur(arr, size) {
+        const temp = new Float32Array(arr.length);
+        for(let y=1; y<size-1; y++) {
+            for(let x=1; x<size-1; x++) {
+                const i = y * size + x;
+                temp[i] = (
+                    arr[i] * 0.5 +
+                    arr[i-1] * 0.125 + arr[i+1] * 0.125 +
+                    arr[i-size] * 0.125 + arr[i+size] * 0.125
+                );
+            }
+        }
+        for(let i=0; i<arr.length; i++) arr[i] = temp[i];
+    }
+
+    function updatePhysics() {
+        const res = CONFIG.GRID_SIZE;
+        const texData = depthTexture.image.data;
+        let totalDepth = 0;
+
+        for (let i = 0; i < res * res; i++) {
+            const force = (targetDepthData[i] - depthData[i]) * CONFIG.SPRING_K;
+            velocityData[i] += force;
+            velocityData[i] *= CONFIG.DAMPING; 
+            depthData[i] += velocityData[i];
+
+            const x = i % res; const y = Math.floor(i / res);
+            if (x > 0 && x < res - 1 && y > 0 && y < res - 1) {
+                const neighborAvg = (depthData[i-1] + depthData[i+1] + depthData[i-res] + depthData[i+res]) * 0.25;
+                depthData[i] += (neighborAvg - depthData[i]) * 0.4;
+            }
+
+            const texY = (res - 1) - y;
+            const texIndex = (texY * res + x) * 4;
+            texData[texIndex] = depthData[i]; 
+            texData[texIndex+1] = 0;          
+            texData[texIndex+2] = 0;          
+            texData[texIndex+3] = 1.0;        
+
+            totalDepth += depthData[i];
+        }
+
+        depthTexture.needsUpdate = true;
+        
+        // 오디오 처리는 animate 루프의 tick()으로 이관됨
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        if(customMaterial) {
+            customMaterial.uniforms.time.value += 0.01;
+            
+            // 1. 동적 색상 보간 (추출된 색상으로 부드럽게 전환)
+            currentColor1.lerp(targetColor1, 0.02);
+            currentColor2.lerp(targetColor2, 0.02);
+            customMaterial.uniforms.uColor1.value.copy(currentColor1);
+            customMaterial.uniforms.uColor2.value.copy(currentColor2);
+            
+            // 2. 동적 방 깊이 보간 (움직임이 없으면 평면으로)
+            let depthFactor = Math.min(globalMotion.intensity * 5.0, 1.0);
+            let targetRoomDepth = depthFactor * CONFIG.BASE_ROOM_DEPTH;
+            
+            currentRoomDepth += (targetRoomDepth - currentRoomDepth) * 0.015;
+            customMaterial.uniforms.baseDepthMax.value = currentRoomDepth;
+        }
+        
+        if(bloomPass) bloomPass.strength += (targetBloomStrength - bloomPass.strength) * 0.05;
+        
+        processMotion(); 
+        updatePhysics();
+        
+        // --- 동적 오디오 시퀀서 및 모듈레이션 업데이트 ---
+        if (AudioEngine.isInitialized) {
+            AudioEngine.tick(globalMotion.intensity, currentRoomDepth);
+        }
+
+        const time = Date.now() * 0.001;
+        camera.position.x = Math.sin(time * 0.5) * 1.5;
+        camera.position.y = Math.cos(time * 0.4) * 1.5;
+        camera.lookAt(0, 0, 0);
+        
+        if(rgbShiftPass) {
+            rgbShiftPass.uniforms['angle'].value = time * 2.0; 
+            rgbShiftPass.uniforms['amount'].value += ((0.001 + globalMotion.intensity * 0.006) - rgbShiftPass.uniforms['amount'].value) * 0.1;
+        }
+
+        composer.render();
+    }
+
+    function onWindowResize() {
+        if (!camera || !renderer || !composer) return;
+        
+        const aspect = window.innerWidth / window.innerHeight;
+        camera.aspect = aspect; 
+        camera.updateProjectionMatrix();
+        
+        // Z=0(가장자리)에서 Plane 메쉬가 화면(Frustum)에 정확히 꽉 차도록 스케일 계산
+        // 이로 인해 Plane의 사이드 벽면이 화면 가장자리에서부터 시작되어 깊은 방 모양을 만듦
+        if (elasticPlane) {
+            const vFov = camera.fov * Math.PI / 180;
+            const h = 2 * Math.tan(vFov / 2) * camera.position.z;
+            const w = h * aspect;
+            elasticPlane.scale.set(w, h, 1);
+        }
+
+        renderer.setSize(window.innerWidth, window.innerHeight); 
+        composer.setSize(window.innerWidth, window.innerHeight);
+    }
+</script>
+</body>
+</html>
