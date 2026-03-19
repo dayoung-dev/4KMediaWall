@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Magical Pop-up Book - Diverse Tales</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Serif+KR:wght@300;400;600&swap" rel="stylesheet">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FilmShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/FilmPass.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            background-color: #120e0c;
+            font-family: 'Cinzel', 'Noto Serif KR', serif;
+            transition: cursor 0.3s;
+            color: #E8DCC4;
+        }
+        body.hide-cursor { cursor: none; }
+        #webgl-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        #start-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center; z-index: 100;
+            background: #120e0c; cursor: pointer;
+        }
+
+        #audio-helper {
+            font-size: 1.2rem; font-weight: 600; color: #fdf5e6;
+            letter-spacing: 0.3em; text-transform: uppercase;
+            animation: breatheUI 3s infinite ease-in-out;
+            padding: 30px 60px;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            background: rgba(255, 235, 205, 0.05);
+            border-radius: 4px;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.1);
+        }
+
+        @keyframes breatheUI {
+            0% { opacity: 0.5; transform: scale(0.98); }
+            50% { opacity: 1; transform: scale(1.02); }
+            100% { opacity: 0.5; transform: scale(0.98); }
+        }
+
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; justify-content: center; align-items: center; z-index: 25;
+            background: rgba(18, 14, 12, 0.85); backdrop-filter: blur(15px);
+            pointer-events: none;
+        }
+        .message { font-size: 1.2rem; font-weight: 400; letter-spacing: 0.15em; text-align: center; color: #d4c4a8; text-transform: uppercase; }
+
+        #settings-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 30;
+            background: rgba(18, 14, 12, 0.8); backdrop-filter: blur(10px);
+            opacity: 0; pointer-events: none; transition: opacity 0.5s;
+        }
+        #settings-layer.active { opacity: 1; pointer-events: auto; }
+        .settings-box {
+            background: rgba(40, 32, 26, 0.9); border: 2px solid rgba(212, 175, 55, 0.4);
+            padding: 40px 50px; border-radius: 8px; text-align: center;
+        }
+        .settings-title { font-size: 1.6rem; letter-spacing: 0.2em; margin-bottom: 30px; color: #D4AF37; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; width: 340px; margin-bottom: 25px; }
+        .setting-label { font-size: 1rem; letter-spacing: 0.1em; color: #E8DCC4; width: 140px; text-align: left; }
+        .toggle-btn {
+            background: transparent; border: 1px solid #D4AF37; color: #D4AF37;
+            padding: 8px 24px; font-family: 'Cinzel', serif; cursor: pointer; transition: 0.3s;
+            letter-spacing: 0.1em; font-size: 1rem; border-radius: 4px; width: 150px;
+        }
+        .toggle-btn:hover { background: #D4AF37; color: #1a1512; }
+        .setting-slider { width: 150px; -webkit-appearance: none; background: transparent; outline: none; }
+        .setting-slider::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: #D4AF37; cursor: pointer; }
+        .setting-slider::-webkit-slider-runnable-track { width: 100%; height: 4px; background: rgba(232,220,196,0.2); border-radius: 2px; }
+        
+        #webcam-video { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            object-fit: cover; z-index: 0; 
+            transform: scaleX(-1); 
+            filter: sepia(0.8) brightness(0.3) contrast(1.2) blur(4px); 
+            opacity: 0; transition: opacity 2s;
+        }
+        #webcam-video.active { opacity: 1; }
+        
+        #webgl-canvas { background: transparent; z-index: 1; }
+        #sample-canvas { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay">
+        <div id="audio-helper">Open The Magic Tale</div>
+    </div>
+
+    <video id="webcam-video" autoplay playsinline muted></video>
+    <canvas id="webgl-canvas"></canvas>
+    <canvas id="sample-canvas"></canvas>
+    
+    <div id="ui-layer">
+        <p class="message" id="error-msg">마법의 책이 닫혀있어 가상의 일러스트로 대체됩니다.</p>
+    </div>
+
+    <div id="settings-layer">
+        <div class="settings-box">
+            <div class="settings-title">BOOK SETTINGS</div>
+            <div class="setting-row">
+                <span class="setting-label">MAGIC SOUNDS</span>
+                <button id="sound-toggle-btn" class="toggle-btn">ON</button>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">POP-UP CAPACITY</span>
+                <input type="range" id="spawn-slider" class="setting-slider" min="50" max="600" value="350">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">GLOW (DUST)</span>
+                <input type="range" id="bloom-slider" class="setting-slider" min="0.1" max="1.5" step="0.1" value="0.3">
+            </div>
+        </div>
+    </div>
+
+<script>
+    const CONFIG = {
+        SAMPLE_WIDTH: 128,         
+        SAMPLE_HEIGHT: 128,
+        MOTION_THRESHOLD: 30,
+        MAX_POPUPS: 350,
+        SPAWN_RATE: 2, 
+        BOOK_WIDTH: 360,
+        BOOK_DEPTH: 240,
+        BASE_BLOOM: 0.3, 
+        MIN_DIST: 26, 
+        MIN_PERSISTENT: 50,
+        FLOW_THRESHOLD: 15 // 모션 방향 인식 민감도를 낮춰 더 잘 반응하게 함
+    };
+
+    function getPageCurve(x) {
+        const normX = Math.abs(x) / (CONFIG.BOOK_WIDTH / 2);
+        return Math.sin(normX * Math.PI) * 15.0;
+    }
+
+    const NATURE_PALETTE = [0x556B2F, 0x2E8B57, 0x6B8E23, 0x3CB371, 0x8FBC8F, 0xDAA520];
+    const HOUSE_PALETTE = [0xFDF5E6, 0xFAEBD7, 0xD2B48C, 0xDEB887, 0xE9967A];
+    const TOWER_PALETTE = [0x708090, 0x778899, 0x696969, 0x808080, 0x4A4A4A];
+
+    const IllustrationShader = {
+        uniforms: {
+            "uColor": { value: new THREE.Color(0xffffff) },
+            "uTime": { value: 0.0 },
+            "uType": { value: 0.0 } 
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+        `,
+        fragmentShader: `
+            uniform vec3 uColor;
+            uniform float uTime;
+            uniform float uType;
+            varying vec2 vUv;
+            float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+            void main() {
+                vec2 uv = vUv;
+                float noise = hash(uv + uTime * 0.01) * 0.1;
+                float border = 0.0;
+                if (uType == 0.0) border = smoothstep(0.85, 1.0, max(abs(uv.x - 0.5) * 2.0, uv.y));
+                else if (uType == 1.0) border = smoothstep(0.40, 0.48, distance(uv, vec2(0.5, 0.4)));
+                else border = smoothstep(0.45, 0.5, max(abs(uv.x - 0.5), abs(uv.y - 0.5)));
+
+                vec3 finalColor = mix(uColor, vec3(0.08, 0.07, 0.06), border);
+                
+                if (uType == 1.0) { // Bush berries
+                    vec2 cell = floor(uv * 5.0); vec2 cellUv = fract(uv * 5.0);
+                    float fruit = smoothstep(0.2, 0.4, cellUv.x) * smoothstep(0.8, 0.6, cellUv.x) * smoothstep(0.2, 0.4, cellUv.y) * smoothstep(0.8, 0.6, cellUv.y);
+                    float fruitArea = step(0.7, hash(cell)) * step(abs(uv.x - 0.5), 0.3) * step(0.2, uv.y) * step(uv.y, 0.8);
+                    finalColor = mix(finalColor, vec3(0.85, 0.2, 0.3), fruit * fruitArea);
+                }
+
+                if (uType == 2.0) { // House roof
+                    float isRoof = step(0.5, uv.y);
+                    finalColor = mix(finalColor, vec3(0.4, 0.15, 0.15), isRoof * (1.0 - border));
+                }
+
+                if (uType >= 2.0) { // Windows
+                    vec2 grid = fract(uv * vec2(4.0, 6.0));
+                    float win = step(0.3, grid.x) * step(grid.x, 0.7) * step(0.3, grid.y) * step(grid.y, 0.7);
+                    float body = step(abs(uv.x - 0.5), 0.3) * step(0.2, uv.y) * (uType == 2.0 ? step(uv.y, 0.5) : step(uv.y, 0.8));
+                    finalColor = mix(finalColor, vec3(1.0, 0.8, 0.4), win * body * 0.8);
+                }
+
+                finalColor -= noise;
+                finalColor *= smoothstep(0.0, 0.25, uv.y);
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `
+    };
+
+    let scene, camera, renderer, composer, bloomPass;
+    let bookGroup, leftPageGroup, rightPageGroup, turningPageMesh;
+    let popups = [];
+    let geometries = {}; 
+    let previousImageData = null, bgData = null; 
+    let isMockMode = false, mockAngle = 0, isUIHidden = true, isExperienceStarted = false;
+    let motionLight, dustSystem;
+    let globalMotion = { targetX: 0, targetZ: 0, active: false, flowX: 0, prevMX: null };
+    let isTurningPage = false;
+    let lastTurnTime = Date.now();
+
+    const video = document.getElementById('webcam-video');
+    const sampleCanvas = document.getElementById('sample-canvas');
+    const ctx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+
+    const AudioEngine = {
+        ctx: null, masterGain: null, isInitialized: false, isMuted: false, lastPopTime: 0,
+        scale: [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25],
+        toggleMute: function() {
+            this.isMuted = !this.isMuted;
+            if (this.masterGain) this.masterGain.gain.setTargetAtTime(this.isMuted ? 0.0 : 0.5, this.ctx.currentTime, 0.05);
+            return this.isMuted;
+        },
+        init: function() {
+            if (this.isInitialized) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioContext();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = 0.5;
+            this.masterGain.connect(this.ctx.destination);
+            this.isInitialized = true;
+        },
+        playPopSound: function() {
+            if (!this.isInitialized || this.isMuted) return;
+            const now = this.ctx.currentTime;
+            if (now - this.lastPopTime < 0.08) return; 
+            this.lastPopTime = now;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(this.scale[Math.floor(Math.random() * this.scale.length)], now);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.1, now + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+            osc.connect(gain); gain.connect(this.masterGain);
+            osc.start(now); osc.stop(now + 0.3);
+        },
+        playTurnSound: function() {
+            if (!this.isInitialized || this.isMuted) return;
+            const now = this.ctx.currentTime;
+            const noise = this.ctx.createBufferSource();
+            const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 1.5, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for(let i=0; i<buffer.length; i++) data[i] = (Math.random()*2-1) * Math.exp(-i/(this.ctx.sampleRate*0.5));
+            noise.buffer = buffer;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass'; filter.frequency.setValueAtTime(800, now);
+            filter.frequency.exponentialRampToValueAtTime(200, now + 1.2);
+            const g = this.ctx.createGain();
+            g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(0.3, now+0.1); g.gain.exponentialRampToValueAtTime(0.001, now+1.4);
+            noise.connect(filter); filter.connect(g); g.connect(this.masterGain);
+            noise.start(now);
+        }
+    };
+
+    document.getElementById('start-overlay').addEventListener('click', function() {
+        if (isExperienceStarted) return;
+        isExperienceStarted = true;
+        AudioEngine.init();
+        gsap.to(this, { opacity: 0, duration: 1, onComplete: () => { this.style.display = 'none'; }});
+        initWebcam().then(() => { 
+            document.getElementById('webcam-video').classList.add('active');
+            initThree(); animate(); 
+        }).catch(() => { enableMockMode(); });
+    });
+
+    function enableMockMode() {
+        if (isMockMode) return;
+        isMockMode = true;
+        document.getElementById('ui-layer').style.display = 'flex';
+        if (!renderer) { initThree(); animate(); }
+    }
+
+    document.getElementById('sound-toggle-btn').addEventListener('click', (e) => {
+        const isMuted = AudioEngine.toggleMute();
+        e.target.innerText = isMuted ? 'OFF' : 'ON';
+    });
+
+    document.getElementById('spawn-slider').addEventListener('input', (e) => { CONFIG.MAX_POPUPS = parseInt(e.target.value); });
+    document.getElementById('bloom-slider').addEventListener('input', (e) => {
+        CONFIG.BASE_BLOOM = parseFloat(e.target.value);
+        if (bloomPass) bloomPass.strength = CONFIG.BASE_BLOOM;
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isExperienceStarted) {
+            isUIHidden = !isUIHidden;
+            document.getElementById('settings-layer').classList.toggle('active', !isUIHidden);
+        }
+        // [테스트 기능] 오른쪽 방향키 누르면 즉시 페이지 전환
+        if (e.key === 'ArrowRight' && isExperienceStarted) {
+            triggerPageTurn('right');
+        }
+    });
+
+    function initWebcam() {
+        return new Promise((resolve, reject) => {
+            navigator.mediaDevices.getUserMedia({ video: { width: 128, height: 128 } })
+                .then(stream => { video.srcObject = stream; video.play(); resolve(); })
+                .catch(reject);
+        });
+    }
+
+    function createCustomGeometries() {
+        const treeShape = new THREE.Shape();
+        treeShape.moveTo(-0.1, 0); treeShape.lineTo(0.1, 0); treeShape.lineTo(0.1, 0.2);
+        treeShape.lineTo(0.4, 0.2); treeShape.lineTo(0.2, 0.5); treeShape.lineTo(0.3, 0.5); treeShape.lineTo(0, 1.0);
+        treeShape.lineTo(-0.3, 0.5); treeShape.lineTo(-0.2, 0.5); treeShape.lineTo(-0.4, 0.2); treeShape.lineTo(-0.1, 0.2);
+        treeShape.lineTo(-0.1, 0);
+        geometries.tree = new THREE.ShapeGeometry(treeShape);
+
+        const bushShape = new THREE.Shape();
+        bushShape.moveTo(-0.4, 0);
+        bushShape.bezierCurveTo(-0.55, 0.2, -0.4, 0.5, -0.25, 0.45); 
+        bushShape.bezierCurveTo(-0.2, 0.75, 0.15, 0.8, 0.2, 0.45);   
+        bushShape.bezierCurveTo(0.3, 0.6, 0.55, 0.3, 0.4, 0);        
+        bushShape.lineTo(-0.4, 0);
+        geometries.bush = new THREE.ShapeGeometry(bushShape);
+
+        const houseShape = new THREE.Shape();
+        houseShape.moveTo(-0.4, 0); houseShape.lineTo(0.4, 0); houseShape.lineTo(0.4, 0.5);
+        houseShape.lineTo(0.5, 0.5); houseShape.lineTo(0, 0.9);
+        houseShape.lineTo(-0.2, 0.74); houseShape.lineTo(-0.2, 0.95); houseShape.lineTo(-0.3, 0.95); houseShape.lineTo(-0.3, 0.66);
+        houseShape.lineTo(-0.5, 0.5); houseShape.lineTo(-0.4, 0.5); houseShape.lineTo(-0.4, 0);
+        geometries.house = new THREE.ShapeGeometry(houseShape);
+
+        const towerShape = new THREE.Shape();
+        towerShape.moveTo(-0.25, 0); towerShape.lineTo(0.25, 0); towerShape.lineTo(0.25, 0.8);
+        towerShape.lineTo(0.35, 0.8); towerShape.lineTo(0.35, 1.0); towerShape.lineTo(0.15, 1.0); towerShape.lineTo(0.15, 0.85);
+        towerShape.lineTo(0.05, 0.85); towerShape.lineTo(0.05, 1.0); towerShape.lineTo(-0.05, 1.0); towerShape.lineTo(-0.05, 0.85);
+        towerShape.lineTo(-0.15, 0.85); towerShape.lineTo(-0.15, 1.0); towerShape.lineTo(-0.35, 1.0); towerShape.lineTo(-0.35, 0.8);
+        towerShape.lineTo(-0.25, 0.8); towerShape.lineTo(-0.25, 0);
+        geometries.tower = new THREE.ShapeGeometry(towerShape);
+    }
+
+    function applyPageCurve(geometry) {
+        const pos = geometry.attributes.position;
+        for(let i=0; i<pos.count; i++) {
+            let x = pos.getX(i); let y = pos.getY(i);
+            let curve = getPageCurve(x);
+            if (y > 0) pos.setY(i, y + curve);
+            else pos.setY(i, y + curve * 0.3); 
+        }
+        geometry.computeVertexNormals();
+    }
+
+    function initThree() {
+        const canvas = document.getElementById('webgl-canvas');
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x120e0c, 0.002);
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
+        camera.position.set(0, 180, 280); camera.lookAt(0, 0, 0);
+        
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0); renderer.shadowMap.enabled = true;
+        
+        scene.add(new THREE.AmbientLight(0xfff5e6, 0.6));
+        const spot = new THREE.SpotLight(0xffd700, 0.8);
+        spot.position.set(100, 300, 100); spot.castShadow = true;
+        scene.add(spot);
+        
+        motionLight = new THREE.SpotLight(0xffddaa, 0.0);
+        motionLight.position.set(0, 180, 0); motionLight.angle = Math.PI / 7; motionLight.penumbra = 0.8;
+        scene.add(motionLight); scene.add(motionLight.target);
+
+        const dustCount = 450;
+        const dustGeo = new THREE.BufferGeometry();
+        const dP = new Float32Array(dustCount * 3), dS = new Float32Array(dustCount), dPh = new Float32Array(dustCount);
+        for(let i = 0; i < dustCount; i++) {
+            dP[i*3] = (Math.random()-0.5)*400; dP[i*3+1] = Math.random()*200-50; dP[i*3+2] = (Math.random()-0.5)*300;
+            dS[i] = Math.random()*2.0+1.0; dPh[i] = Math.random()*Math.PI*2;
+        }
+        dustGeo.setAttribute('position', new THREE.BufferAttribute(dP, 3));
+        dustGeo.setAttribute('size', new THREE.BufferAttribute(dS, 1));
+        dustGeo.setAttribute('phase', new THREE.BufferAttribute(dPh, 1));
+        dustSystem = new THREE.Points(dustGeo, new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0.0 } },
+            vertexShader: `
+                uniform float time; attribute float size; attribute float phase; varying float vAlpha;
+                void main() {
+                    vec3 pos = position; pos.y += time * 15.0; pos.y = mod(pos.y + 50.0, 250.0) - 50.0;
+                    pos.x += sin(time * 0.3 + phase) * 15.0; pos.z += cos(time * 0.3 + phase) * 15.0;
+                    vec4 mvP = modelViewMatrix * vec4(pos, 1.0);
+                    gl_PointSize = size * (200.0 / -mvP.z); gl_Position = projectionMatrix * mvP;
+                    vAlpha = 0.2 + 0.5 * sin(time * 3.0 + phase);
+                }
+            `,
+            fragmentShader: `
+                varying float vAlpha;
+                void main() {
+                    vec2 c = gl_PointCoord - vec2(0.5); float d = length(c);
+                    if (d > 0.5) discard;
+                    gl_FragColor = vec4(vec3(20.0, 15.0, 5.0) * smoothstep(0.5, 0.0, d), vAlpha * smoothstep(0.5, 0.0, d));
+                }
+            `,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+        }));
+        scene.add(dustSystem);
+
+        createCustomGeometries();
+        bookGroup = new THREE.Group(); scene.add(bookGroup);
+
+        const coverGeo = new THREE.BoxGeometry(CONFIG.BOOK_WIDTH + 20, 2, CONFIG.BOOK_DEPTH + 10, 32, 1, 1);
+        const cp = coverGeo.attributes.position;
+        for(let i=0; i<cp.count; i++) cp.setY(i, cp.getY(i) + getPageCurve(cp.getX(i)) * 0.15);
+        coverGeo.computeVertexNormals();
+        const cover = new THREE.Mesh(coverGeo, new THREE.MeshStandardMaterial({ color: 0x2a1a10 }));
+        cover.position.y = -3; cover.receiveShadow = true; bookGroup.add(cover);
+        
+        const pGeoL = new THREE.BoxGeometry(CONFIG.BOOK_WIDTH / 2, 4, CONFIG.BOOK_DEPTH, 40, 1, 1); pGeoL.translate(-CONFIG.BOOK_WIDTH / 4, 0, 0); applyPageCurve(pGeoL);
+        const pGeoR = new THREE.BoxGeometry(CONFIG.BOOK_WIDTH / 2, 4, CONFIG.BOOK_DEPTH, 40, 1, 1); pGeoR.translate(CONFIG.BOOK_WIDTH / 4, 0, 0); applyPageCurve(pGeoR);
+
+        leftPageGroup = new THREE.Group(); bookGroup.add(leftPageGroup);
+        leftPageGroup.add(new THREE.Mesh(pGeoL, new THREE.MeshStandardMaterial({ color: 0xFDF5E6 })));
+        rightPageGroup = new THREE.Group(); bookGroup.add(rightPageGroup);
+        rightPageGroup.add(new THREE.Mesh(pGeoR, new THREE.MeshStandardMaterial({ color: 0xFDF5E6 })));
+
+        const tGeo = new THREE.BoxGeometry(CONFIG.BOOK_WIDTH / 2, 1, CONFIG.BOOK_DEPTH, 40, 1, 1);
+        tGeo.translate(CONFIG.BOOK_WIDTH / 4, 0, 0);
+        turningPageMesh = new THREE.Mesh(tGeo, new THREE.MeshStandardMaterial({ color: 0xF5F5DC, side: THREE.DoubleSide }));
+        turningPageMesh.visible = false;
+        bookGroup.add(turningPageMesh);
+
+        for (let i = 0; i < CONFIG.MAX_POPUPS; i++) {
+            const mat = new THREE.ShaderMaterial({
+                uniforms: THREE.UniformsUtils.clone(IllustrationShader.uniforms),
+                vertexShader: IllustrationShader.vertexShader, fragmentShader: IllustrationShader.fragmentShader, side: THREE.DoubleSide
+            });
+            const mesh = new THREE.Mesh(geometries['bush'], mat); mesh.visible = false; mesh.castShadow = true;
+            popups.push({ mesh, active: false, birth: 0, targetRotation: 0, velocity: 0, type: 'bush' });
+        }
+
+        composer = new THREE.EffectComposer(renderer);
+        composer.addPass(new THREE.RenderPass(scene, camera));
+        bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), CONFIG.BASE_BLOOM, 2.0, 0.3);
+        composer.addPass(bloomPass);
+        composer.addPass(new THREE.FilmPass(0.4, 0.0, 0, false));
+        window.addEventListener('resize', onWindowResize);
+    }
+
+    // 페이지 넘김 로직 (여러 장 넘김 옵션 추가)
+    function triggerPageTurn(direction, multiple = false) {
+        if (isTurningPage) return;
+        isTurningPage = true;
+        AudioEngine.playTurnSound();
+
+        turningPageMesh.visible = true;
+        
+        // 수정된 부분: 오른쪽으로 넘길 때(이전장으로 갈때) 땅속을 파고들지 않도록 Math.PI 에서 0으로 회전하게 만듦
+        turningPageMesh.rotation.z = (direction === 'left') ? 0 : Math.PI;
+        
+        const targetRot = (direction === 'left') ? Math.PI : 0;
+        
+        popups.forEach(p => { p.active = false; }); // 모든 팝업 접기
+        lastTurnTime = Date.now(); // 타이머 리셋
+
+        // 여러 장 연속 넘김 효과 (정각 연출용)
+        if (multiple) {
+            let turnCount = 0;
+            const turnAction = () => {
+                turningPageMesh.rotation.z = (direction === 'left') ? 0 : Math.PI;
+                gsap.to(turningPageMesh.rotation, {
+                    z: targetRot, duration: 0.6, ease: "power1.inOut",
+                    onUpdate: updateTurningCurve,
+                    onComplete: () => {
+                        turnCount++;
+                        if(turnCount < 3) { AudioEngine.playTurnSound(); turnAction(); } // 3번 연속
+                        else finalizeTurn();
+                    }
+                });
+            };
+            turnAction();
+        } else {
+            // 한 장 넘김
+            gsap.to(turningPageMesh.rotation, {
+                z: targetRot, duration: 1.2, ease: "power2.inOut",
+                onUpdate: updateTurningCurve,
+                onComplete: finalizeTurn
+            });
+        }
+    }
+
+    function updateTurningCurve() {
+        const pos = turningPageMesh.geometry.attributes.position;
+        const angle = Math.abs(turningPageMesh.rotation.z);
+        for(let i=0; i<pos.count; i++) {
+            let x = pos.getX(i);
+            pos.setY(i, Math.sin((x / (CONFIG.BOOK_WIDTH/2)) * Math.PI) * 35 * Math.sin(angle));
+        }
+        turningPageMesh.geometry.computeVertexNormals();
+    }
+
+    function finalizeTurn() {
+        turningPageMesh.visible = false;
+        isTurningPage = false;
+        for(let i=0; i<15; i++) spawnAmbientPopup(); // 새 장에 팝업 심기
+    }
+
+    function spawnPopup(camX, camY, r, g, b) {
+        if (isTurningPage) return;
+        let worldX = (camX / CONFIG.SAMPLE_WIDTH - 0.5) * CONFIG.BOOK_WIDTH;
+        let worldZ = (camY / CONFIG.SAMPLE_HEIGHT - 0.5) * CONFIG.BOOK_DEPTH;
+        worldX += (Math.random()-0.5)*35; worldZ += (Math.random()-0.5)*35;
+        
+        if (popups.some(p => p.active && p.mesh.position.distanceTo(new THREE.Vector3(worldX, 0.5, worldZ)) < CONFIG.MIN_DIST)) return;
+
+        let p = popups.find(item => !item.active);
+        if (!p) {
+            p = popups.reduce((o, c) => (c.birth < o.birth ? c : o), popups[0]);
+            p.active = false; return;
+        }
+
+        const d = Math.sqrt(worldX*worldX + worldZ*worldZ);
+        let type = 'bush', tIdx = 1.0;
+        if (d < 60) { const rnd = Math.random(); if(rnd<0.6){type='house';tIdx=2.0;} else if(rnd<0.8){type='tree';tIdx=0.0;} }
+        else if (d > 100 && popups.filter(i=>i.active && i.type==='tower').length < 2 && Math.random()<0.1) {type='tower';tIdx=3.0;}
+        else { if(Math.random()<0.6){type='tree';tIdx=0.0;} }
+
+        p.type = type; p.mesh.geometry = geometries[type]; p.mesh.material.uniforms.uType.value = tIdx;
+        p.active = true; p.birth = Date.now();
+        
+        let lX = Math.max(-CONFIG.BOOK_WIDTH/2+15, Math.min(CONFIG.BOOK_WIDTH/2-15, worldX));
+        let cZ = Math.max(-CONFIG.BOOK_DEPTH/2+15, Math.min(CONFIG.BOOK_DEPTH/2-15, worldZ));
+        if (lX < 0) leftPageGroup.add(p.mesh); else rightPageGroup.add(p.mesh);
+
+        p.mesh.position.set(lX, 2.0 + getPageCurve(lX), cZ);
+        const s = type==='tree'?22:(type==='bush'?18:(type==='house'?20:16));
+        const hM = type==='tower'?1.6:(type==='tree'?1.4:(type==='bush'?0.75:1.1));
+        p.mesh.scale.set(s+Math.random()*6, (s+Math.random()*8)*hM, 1);
+        
+        let pal = type==='house'?HOUSE_PALETTE:(type==='tower'?TOWER_PALETTE:NATURE_PALETTE);
+        let col = new THREE.Color(pal[Math.floor(Math.random()*pal.length)]);
+        if(r>=0) col.lerp(new THREE.Color(r/255,g/255,b/255), 0.3);
+        p.mesh.material.uniforms.uColor.value.copy(col);
+        p.mesh.rotation.set(-Math.PI/2, (Math.random()-0.5)*0.3, 0);
+        p.targetRotation = (Math.random()-0.5)*0.1; p.velocity = 0; p.mesh.visible = true;
+        AudioEngine.playPopSound();
+    }
+
+    function spawnAmbientPopup() { spawnPopup(Math.random()*128, Math.random()*128, -1,-1,-1); }
+
+    function processMotion() {
+        if (isMockMode) {
+            ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(0,0,128,128); mockAngle += 0.05;
+            ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(64 + Math.cos(mockAngle)*40, 64 + Math.sin(mockAngle*2)*20, 10, 0, 7); ctx.fill();
+        } else {
+            if (video.readyState < 2) return;
+            ctx.save(); ctx.translate(128, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0, 128, 128); ctx.restore();
+        }
+        const curr = ctx.getImageData(0,0,128,128).data;
+        if (!bgData) bgData = new Float32Array(curr);
+        if (previousImageData) {
+            let count = 0, mX = 0, mY = 0, mC = 0; 
+            for (let i = 0; i < curr.length; i += 32) {
+                if (Math.abs(curr[i] - previousImageData[i]) > CONFIG.MOTION_THRESHOLD * 2.5) {
+                    let cx = (i/4)%128; let cy = Math.floor((i/4)/128);
+                    mX += cx; mY += cy; mC++;
+                    if (count < CONFIG.SPAWN_RATE) { spawnPopup(cx, cy, curr[i], curr[i+1], curr[i+2]); count++; }
+                }
+            }
+            if (mC > 0) {
+                let currentMX = mX / mC;
+                if (globalMotion.prevMX !== null) {
+                    // 모션이 발생한 좌표의 변화량(Vector)을 누적하여 쓸어넘김 판별
+                    const deltaX = currentMX - globalMotion.prevMX;
+                    globalMotion.flowX += deltaX; 
+                }
+                globalMotion.prevMX = currentMX;
+                globalMotion.targetX = (currentMX / 128 - 0.5) * CONFIG.BOOK_WIDTH;
+                globalMotion.targetZ = (mY / mC / 128 - 0.5) * CONFIG.BOOK_DEPTH;
+                globalMotion.active = true;
+            } else {
+                globalMotion.active = false; globalMotion.prevMX = null;
+            }
+        }
+        previousImageData = new Uint8Array(curr);
+        
+        // 방향 감지 및 페이지 전환 트리거
+        if (Math.abs(globalMotion.flowX) > CONFIG.FLOW_THRESHOLD) {
+            triggerPageTurn(globalMotion.flowX > 0 ? 'right' : 'left');
+            globalMotion.flowX = 0; // 초기화
+        }
+        globalMotion.flowX *= 0.85; // 움직임이 없으면 금방 0으로 수렴
+    }
+
+    function updatePopups() {
+        popups.forEach(p => {
+            p.mesh.material.uniforms.uTime.value += 0.05;
+            if (p.active) {
+                p.velocity += (p.targetRotation - p.mesh.rotation.x) * 0.15;
+                p.velocity *= 0.8; p.mesh.rotation.x += p.velocity;
+            } else {
+                p.mesh.rotation.x += (-Math.PI / 2 - p.mesh.rotation.x) * 0.15;
+                if (p.mesh.rotation.x < -Math.PI / 2 + 0.05) p.mesh.visible = false;
+            }
+            p.mesh.rotation.x = Math.max(-Math.PI / 2, p.mesh.rotation.x);
+        });
+    }
+
+    // 타이머 기반 이벤트 처리
+    function checkTimeEvents() {
+        if (isTurningPage) return;
+        const now = Date.now();
+        const d = new Date(now);
+        
+        // 정각 체크 (00분 00초에 근접할 때)
+        if (d.getMinutes() === 0 && d.getSeconds() === 0 && (now - lastTurnTime > 60000)) {
+            triggerPageTurn('right', true); // 여러 장 차라락
+        } 
+        // 5분 경과 체크
+        else if (now - lastTurnTime > 5 * 60 * 1000) { 
+            triggerPageTurn(Math.random() > 0.5 ? 'right' : 'left');
+        }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        processMotion(); updatePopups(); checkTimeEvents();
+        
+        if (dustSystem) dustSystem.material.uniforms.time.value += 0.01;
+        if (motionLight) {
+            if (globalMotion.active) {
+                motionLight.target.position.x += (globalMotion.targetX - motionLight.target.position.x) * 0.1;
+                motionLight.target.position.z += (globalMotion.targetZ - motionLight.target.position.z) * 0.1;
+                motionLight.intensity += (1.5 - motionLight.intensity) * 0.1;
+            } else motionLight.intensity += (0.0 - motionLight.intensity) * 0.05;
+        }
+        if (!isTurningPage && Math.random() < 0.015) { 
+            const aP = popups.filter(p => p.active);
+            if (aP.length > 10) {
+                const mP = aP.filter(p => Date.now() - p.birth > 5000);
+                if (mP.length > 0) { mP[Math.floor(Math.random()*mP.length)].active = false; spawnAmbientPopup(); }
+            }
+        }
+        if (!isTurningPage && popups.filter(p => p.active && p.mesh.visible).length < CONFIG.MIN_PERSISTENT && Math.random() < 0.05) spawnAmbientPopup();
+        
+        const t = Date.now() * 0.001;
+        if (leftPageGroup) leftPageGroup.rotation.z = Math.sin(t*0.5) * 0.01;
+        if (rightPageGroup) rightPageGroup.rotation.z = -Math.sin(t*0.5) * 0.01;
+        camera.position.x = Math.sin(t * 0.2) * 20; camera.lookAt(0, 0, 0);
+        composer.render();
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
+    }
+</script>
+</body>
+</html>
