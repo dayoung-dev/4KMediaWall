@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Magical Strata - Luminous Media Art</title>
+
+    <!-- Google Fonts: 세련된 Serif와 모던한 텍스트 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Serif+KR:wght@200;300;400&display=swap" rel="stylesheet">
+
+    <!-- Three.js 및 Post-processing 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FilmShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/FilmPass.js"></script>
+    <!-- RGB Shift for modern media art feel -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/RGBShiftShader.js"></script>
+
+    <!-- GSAP for UI Animation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+            background-color: #030305; 
+            font-family: 'Cinzel', 'Noto Serif KR', serif;
+            transition: cursor 0.3s;
+            color: #EBE9E4;
+        }
+
+        body.hide-cursor { cursor: none; }
+
+        #webgl-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: none; justify-content: center; align-items: center; z-index: 25;
+            background: rgba(3, 3, 5, 0.85); backdrop-filter: blur(15px);
+        }
+
+        .message { font-size: 1.1rem; font-weight: 300; letter-spacing: 0.15em; text-align: center; color: #a19d92; text-transform: uppercase; }
+
+        #helper-text {
+            position: absolute; bottom: 30px; right: 40px; font-size: 0.8rem;
+            color: rgba(216, 211, 197, 0.3); z-index: 15; letter-spacing: 0.2em;
+            pointer-events: none; opacity: 0; transition: opacity 0.5s; text-transform: uppercase;
+        }
+
+        #audio-helper {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 0.9rem; font-weight: 400; color: #ffffff;
+            z-index: 20; letter-spacing: 0.3em; pointer-events: none; text-transform: uppercase;
+            animation: breatheUI 3s infinite ease-in-out;
+            background: rgba(255, 255, 255, 0.02); padding: 20px 45px;
+            border: 1px solid rgba(255, 255, 255, 0.15); backdrop-filter: blur(8px);
+        }
+
+        @keyframes breatheUI {
+            0% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.98); box-shadow: 0 0 0px rgba(255,255,255,0); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.02); box-shadow: 0 0 20px rgba(255,255,255,0.1); }
+            100% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.98); box-shadow: 0 0 0px rgba(255,255,255,0); }
+        }
+
+        #settings-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 30;
+            background: rgba(3, 3, 5, 0.6); backdrop-filter: blur(8px);
+            opacity: 0; pointer-events: none; transition: opacity 0.5s;
+        }
+        #settings-layer.active { opacity: 1; pointer-events: auto; }
+        .settings-box {
+            background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 40px 50px; border-radius: 12px; text-align: center;
+        }
+        .settings-title { font-size: 1.5rem; letter-spacing: 0.2em; margin-bottom: 30px; color: #ffffff; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; width: 320px; margin-bottom: 20px; }
+        .setting-label { font-size: 1rem; letter-spacing: 0.1em; color: #EBE9E4; width: 120px; text-align: left; }
+        .toggle-btn {
+            background: transparent; border: 1px solid #EBE9E4; color: #EBE9E4;
+            padding: 8px 24px; font-family: 'Cinzel', serif; cursor: pointer; transition: 0.3s;
+            letter-spacing: 0.1em; font-size: 1rem; border-radius: 4px; width: 150px;
+        }
+        .toggle-btn:hover { background: #EBE9E4; color: #030305; }
+
+        .setting-slider {
+            width: 150px; -webkit-appearance: none; background: transparent; outline: none;
+        }
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+            background: #EBE9E4; cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        .setting-slider::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; cursor: pointer; background: rgba(255,255,255,0.2); border-radius: 2px;
+        }
+
+        #sample-canvas, #webcam-video { display: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="webgl-canvas"></canvas>
+
+    <video id="webcam-video" autoplay playsinline muted></video>
+    <canvas id="sample-canvas"></canvas>
+    
+    <div id="ui-layer">
+        <p class="message" id="error-msg">마법의 거울이 닫혀있어 가상의 요정 데이터로 대체됩니다.</p>
+    </div>
+
+    <!-- 설정 패널 UI -->
+    <div id="settings-layer">
+        <div class="settings-box">
+            <div class="settings-title">CONFIGURATION</div>
+            <div class="setting-row">
+                <span class="setting-label">WEBCAM</span>
+                <button id="webcam-toggle-btn" class="toggle-btn">ON</button>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">BG MIRROR</span>
+                <button id="mirror-toggle-btn" class="toggle-btn">ON</button>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">AUDIO</span>
+                <button id="sound-toggle-btn" class="toggle-btn">ON</button>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">PARTICLES</span>
+                <input type="range" id="spawn-slider" class="setting-slider" min="10" max="600" value="150">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">BLOOM</span>
+                <input type="range" id="bloom-slider" class="setting-slider" min="0.2" max="2.5" step="0.1" value="0.6">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">GRAVITY</span>
+                <input type="range" id="gravity-slider" class="setting-slider" min="0.01" max="0.15" step="0.005" value="0.045">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">FAIRY SIZE</span>
+                <input type="range" id="mock-size-slider" class="setting-slider" min="2" max="40" step="1" value="8">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">FAIRY SPEED</span>
+                <input type="range" id="mock-speed-slider" class="setting-slider" min="0.002" max="0.06" step="0.002" value="0.012">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">FAIRY SPREAD</span>
+                <input type="range" id="mock-spread-slider" class="setting-slider" min="0.1" max="2.5" step="0.1" value="1.0">
+            </div>
+        </div>
+    </div>
+
+    <div id="helper-text">[ESC] Configure / Auto-Restore</div>
+    <div id="audio-helper">Awaken The Strata</div>
+
+<script>
+    const CONFIG = {
+        MAX_PARTICLES: 85000,     
+        MAX_SPAWN_PER_FRAME: 150,  
+        SAMPLE_WIDTH: 128,         
+        SAMPLE_HEIGHT: 128,
+        MOTION_THRESHOLD: 25,
+        PRESENCE_THRESHOLD: 35, 
+        GRAVITY: 0.045,            
+        PARTICLE_SIZE: 4.5, 
+        BASE_BLOOM: 0.6, 
+        
+        X_BINS: 130,               
+        Z_BINS: 16,                
+        SLIDE_THRESHOLD: 1.2,      
+        WORLD_WIDTH: 420,
+        WORLD_HEIGHT: 210,
+        WORLD_DEPTH: 55,
+        MOCK_SIZE: 8,
+        MOCK_SPEED: 0.012,
+        MOCK_SPREAD: 1.0
+    };
+
+    const STRATA_PALETTE = [
+        0x00D0FF, 0xFF0055, 0x7A1EE2, 0xFFB700, 
+        0x00EFAA, 0xE251B5, 0x4B0082, 0x00A3FF 
+    ];
+
+    const LocalizedRGBShiftShader = {
+        uniforms: {
+            "tDiffuse": { value: null },
+            "amount":   { value: 0.005 },
+            "angle":    { value: 0.0 },
+            "center":   { value: new THREE.Vector2(0.5, 0.5) },
+            "radius":   { value: 0.35 },
+            "baseAmount": { value: 0.001 },
+            "aspect":   { value: 1.0 }
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D tDiffuse;
+            uniform float amount;
+            uniform float angle;
+            uniform vec2 center;
+            uniform float radius;
+            uniform float baseAmount;
+            uniform float aspect;
+            varying vec2 vUv;
+
+            void main() {
+                vec2 pos = vUv;
+                vec2 ctr = center;
+                pos.x *= aspect;
+                ctr.x *= aspect;
+                
+                float dist = distance(pos, ctr);
+                float falloff = smoothstep(radius, 0.0, dist);
+                
+                float finalAmount = baseAmount + (amount * falloff);
+                vec2 offset = finalAmount * vec2(cos(angle), sin(angle));
+                
+                vec4 cr = texture2D(tDiffuse, vUv + offset);
+                vec4 cga = texture2D(tDiffuse, vUv);
+                vec4 cb = texture2D(tDiffuse, vUv - offset);
+                
+                gl_FragColor = vec4(cr.r, cga.g, cb.b, cga.a);
+            }
+        `
+    };
+
+    let scene, camera, renderer, composer, bloomPass, rgbShiftPass;
+    let particles, positions, colors, velocities, active, settled, life;
+    let particleGeometry, particleMaterial, particleSystem;
+    let dustSystem; // 부유하는 빛 먼지
+    let heightGrid; 
+    let particleIdx = 0;
+    let videoPlane, videoMat; 
+    let strataShadowGeo, shadowMat, abyssMesh;
+    let targetBloomStrength = 0.6; 
+
+    const video = document.getElementById('webcam-video');
+    const sampleCanvas = document.getElementById('sample-canvas');
+    const ctx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+    
+    let previousImageData = null;
+    let bgData = null; 
+    let globalMotion = { x: 0, y: 0, uvX: 0.5, uvY: 0.5, intensity: 0 };
+    let isMockMode = false, mockAngle = 0, isUIHidden = true; 
+    let isMirrorVisible = true;
+    let lastMotionTime = Date.now();
+    let currentStream = null;
+
+    // 4K 최적화: 가비지 컬렉션(GC) 멈춤 현상 방지를 위한 메모리 풀 사전 할당
+    const MAX_POOL_SIZE = (CONFIG.SAMPLE_WIDTH * CONFIG.SAMPLE_HEIGHT) / 4;
+    const activePxPool = new Float32Array(MAX_POOL_SIZE * 5);
+    const presencePxPool = new Float32Array(MAX_POOL_SIZE * 5);
+
+    const AudioEngine = {
+        ctx: null, convolver: null, masterGain: null, compressor: null, droneGain: null, droneEq: null, harmonicGains: [], windGain: null, windFilter: null,
+        isInitialized: false, isMuted: false, settledBuffer: [], lastChimeTime: 0, lastAmbienceUpdate: 0,
+        scale: [164.81, 185.00, 207.65, 246.94, 277.18, 329.63, 369.99, 415.30, 493.88, 554.37, 659.25, 739.99, 830.61],
+
+        toggleMute: function() {
+            this.isMuted = !this.isMuted;
+            if (this.isInitialized && this.masterGain) {
+                this.masterGain.gain.setTargetAtTime(this.isMuted ? 0.0 : 0.65, this.ctx.currentTime, 0.05);
+            }
+            return this.isMuted;
+        },
+
+        init: function() {
+            if (this.isInitialized) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioContext();
+
+            this.compressor = this.ctx.createDynamicsCompressor();
+            this.compressor.threshold.value = -15;
+            this.compressor.knee.value = 30;
+            this.compressor.ratio.value = 4;
+            this.compressor.attack.value = 0.1;
+            this.compressor.release.value = 0.5;
+            this.compressor.connect(this.ctx.destination);
+
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = this.isMuted ? 0.0 : 0.65;
+            this.masterGain.connect(this.compressor);
+            
+            this.convolver = this.ctx.createConvolver();
+            const length = this.ctx.sampleRate * 8.0; 
+            const impulse = this.ctx.createBuffer(2, length, this.ctx.sampleRate);
+            for (let i = 0; i < 2; i++) {
+                const channel = impulse.getChannelData(i);
+                for (let j = 0; j < length; j++) channel[j] = (Math.random() * 2 - 1) * Math.exp(-j / (this.ctx.sampleRate * 1.8));
+            }
+            this.convolver.buffer = impulse;
+            this.convolver.connect(this.masterGain);
+            
+            this.startDrone();
+            this.startWind();
+            this.isInitialized = true;
+        },
+        
+        startDrone: function() {
+            this.droneEq = this.ctx.createBiquadFilter();
+            this.droneEq.type = 'peaking';
+            this.droneEq.frequency.value = 300; 
+            this.droneEq.Q.value = 1.0; 
+            this.droneEq.gain.value = -5.0; 
+            this.droneEq.connect(this.convolver);
+
+            this.droneGain = this.ctx.createGain(); 
+            this.droneGain.gain.value = 0.08; 
+            this.droneGain.connect(this.droneEq);
+            
+            const oscsInfo = [{f: 82.41, pan: -0.35}, {f: 82.8, pan: 0.35}, {f: 123.47, pan: 0.0}];
+            oscsInfo.forEach(info => {
+                const o = this.ctx.createOscillator(); o.type = info.f === 82.8 ? 'triangle' : 'sine';
+                o.frequency.value = info.f; 
+                const p = this.ctx.createStereoPanner(); p.pan.value = info.pan;
+                o.connect(p); p.connect(this.droneGain); o.start();
+            });
+            
+            const lfo = this.ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.045; 
+            const lfoGain = this.ctx.createGain(); 
+            lfoGain.gain.value = 0.015;
+            lfo.connect(lfoGain); lfoGain.connect(this.droneGain.gain); lfo.start();
+
+            this.harmonicGains = [];
+            const freqs = [{f: 164.81, pan: -0.5}, {f: 207.65, pan: 0.5}, {f: 311.13, pan: 0.0}]; 
+            freqs.forEach(info => {
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.frequency.value = info.f; gain.gain.value = 0.0;
+                const p = this.ctx.createStereoPanner(); p.pan.value = info.pan;
+                osc.connect(gain); gain.connect(p); p.connect(this.droneEq); osc.start();
+                this.harmonicGains.push(gain);
+            });
+        },
+        
+        startWind: function() {
+            const bufferSize = this.ctx.sampleRate * 2;
+            const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            
+            let b0 = 0, b1 = 0, b2 = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                let white = Math.random() * 2 - 1;
+                b0 = 0.99886 * b0 + white * 0.0555179;
+                b1 = 0.99332 * b1 + white * 0.0750759;
+                b2 = 0.96900 * b2 + white * 0.1538520;
+                output[i] = (b0 + b1 + b2 + white * 0.1) * 0.2;
+            }
+            
+            const noise = this.ctx.createBufferSource(); noise.buffer = noiseBuffer; noise.loop = true;
+            this.windFilter = this.ctx.createBiquadFilter(); this.windFilter.type = 'lowpass'; this.windFilter.frequency.value = 85; 
+            this.windGain = this.ctx.createGain(); this.windGain.gain.value = 0.0; 
+            
+            noise.connect(this.windFilter); this.windFilter.connect(this.windGain); this.windGain.connect(this.convolver);
+            noise.start();
+        },
+
+        updateMotion: function(motionIntensity) {
+            if (!this.isInitialized) return;
+            this.windGain.gain.setTargetAtTime(motionIntensity * 0.22, this.ctx.currentTime, 1.2);
+            this.windFilter.frequency.setTargetAtTime(85 + motionIntensity * 500, this.ctx.currentTime, 1.2);
+        },
+
+        updateAmbience: function(grid) {
+            if (!this.isInitialized || !grid) return;
+            const now = this.ctx.currentTime;
+            if (now - this.lastAmbienceUpdate < 0.5) return; 
+            this.lastAmbienceUpdate = now;
+
+            let sum = 0, count = 0, varianceSum = 0;
+            const xBins = grid.length, zBins = grid[0].length;
+            for (let x = 0; x < xBins; x++) { for (let z = 0; z < zBins; z++) { sum += grid[x][z]; count++; } }
+            const mean = sum / count;
+            for (let x = 0; x < xBins; x++) { for (let z = 0; z < zBins; z++) { varianceSum += Math.pow(grid[x][z] - mean, 2); } }
+            const stdDev = Math.sqrt(varianceSum / count);
+
+            const normHeight = Math.max(0, Math.min(1, (mean + (CONFIG.WORLD_HEIGHT / 2)) / 95));
+            const normRoughness = Math.max(0, Math.min(1, stdDev / 25.0));
+
+            this.harmonicGains[0].gain.setTargetAtTime(normHeight * 0.08, now, 3.5);
+            this.harmonicGains[1].gain.setTargetAtTime(Math.pow(normHeight, 2) * 0.07, now, 3.5);
+            this.harmonicGains[2].gain.setTargetAtTime(normRoughness * 0.07, now, 3.5);
+        },
+
+        addSettled: function(x, y) { this.settledBuffer.push({x, y}); },
+
+        tick: function() {
+            if (!this.isInitialized) return;
+            if (this.settledBuffer.length > 0 && this.ctx.currentTime - this.lastChimeTime > 0.3) {
+                const intensity = Math.min(this.settledBuffer.length / 45, 1.0);
+                const avgY = this.settledBuffer.reduce((sum, p) => sum + p.y, 0) / this.settledBuffer.length;
+                const avgX = this.settledBuffer.reduce((sum, p) => sum + p.x, 0) / this.settledBuffer.length;
+                
+                const normalizedY = Math.max(0, Math.min(1, (avgY + 100) / 200)); 
+                const noteIndex = Math.floor(normalizedY * (this.scale.length - 1));
+                
+                const panValue = Math.max(-1, Math.min(1, avgX / (CONFIG.WORLD_WIDTH / 2.5)));
+
+                this.playChime(this.scale[noteIndex], intensity * 0.3, panValue);
+                this.settledBuffer = [];
+                this.lastChimeTime = this.ctx.currentTime;
+            } else if (this.settledBuffer.length > 350) {
+                this.settledBuffer = [];
+            }
+        },
+        
+        playChime: function(pitch, velocity, pan) {
+            const osc1 = this.ctx.createOscillator(); const osc2 = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+            osc1.type = 'sine'; osc2.type = 'triangle'; 
+            osc1.frequency.value = pitch; osc2.frequency.value = pitch * 2.0;
+            const now = this.ctx.currentTime;
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(velocity, now + 0.15);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 7.0);
+            
+            const osc2Gain = this.ctx.createGain(); osc2Gain.gain.value = 0.15;
+            const panner = this.ctx.createStereoPanner(); 
+            panner.pan.value = pan * 0.75; 
+            
+            osc1.connect(gain); osc2.connect(osc2Gain); osc2Gain.connect(gain); 
+            gain.connect(panner); panner.connect(this.convolver);
+            
+            osc1.start(now); osc2.start(now); osc1.stop(now + 7.5); osc2.stop(now + 7.5);
+        }
+    };
+
+    window.addEventListener('load', startExperience);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('beforeunload', autoSaveStrataData);
+    
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('#settings-layer')) return; 
+
+        if (!AudioEngine.isInitialized) {
+            AudioEngine.init();
+            gsap.to('#audio-helper', { opacity: 0, duration: 1.5, onComplete: () => {
+                document.getElementById('audio-helper').style.display = 'none';
+            } });
+        }
+    });
+
+    document.getElementById('sound-toggle-btn').addEventListener('click', (e) => {
+        const isMuted = AudioEngine.toggleMute();
+        e.target.innerText = isMuted ? 'OFF' : 'ON';
+    });
+
+    document.getElementById('webcam-toggle-btn').addEventListener('click', async (e) => {
+        if (!isMockMode) {
+            // 웹캠 끄기
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            isMockMode = true;
+            e.target.innerText = 'OFF';
+        } else {
+            // 웹캠 켜기
+            e.target.innerText = '...';
+            try {
+                await initWebcam();
+                isMockMode = false;
+                e.target.innerText = 'ON';
+            } catch (err) {
+                isMockMode = true;
+                e.target.innerText = 'OFF';
+            }
+        }
+    });
+
+    document.getElementById('mirror-toggle-btn').addEventListener('click', (e) => {
+        isMirrorVisible = !isMirrorVisible;
+        e.target.innerText = isMirrorVisible ? 'ON' : 'OFF';
+        if (videoPlane) {
+            videoPlane.visible = isMirrorVisible;
+        }
+    });
+
+    document.getElementById('spawn-slider').addEventListener('input', (e) => {
+        CONFIG.MAX_SPAWN_PER_FRAME = parseInt(e.target.value);
+    });
+
+    document.getElementById('bloom-slider').addEventListener('input', (e) => {
+        CONFIG.BASE_BLOOM = parseFloat(e.target.value);
+        if (globalMotion.intensity <= 0.05) targetBloomStrength = CONFIG.BASE_BLOOM;
+    });
+
+    document.getElementById('gravity-slider').addEventListener('input', (e) => {
+        CONFIG.GRAVITY = parseFloat(e.target.value);
+    });
+
+    document.getElementById('mock-size-slider').addEventListener('input', (e) => {
+        CONFIG.MOCK_SIZE = parseInt(e.target.value);
+    });
+
+    document.getElementById('mock-speed-slider').addEventListener('input', (e) => {
+        CONFIG.MOCK_SPEED = parseFloat(e.target.value);
+    });
+
+    document.getElementById('mock-spread-slider').addEventListener('input', (e) => {
+        CONFIG.MOCK_SPREAD = parseFloat(e.target.value);
+    });
+
+    function startExperience() {
+        initWebcam().then(() => {
+            enterExhibitionMode();
+            initThree();
+            animate();
+            setInterval(autoSaveStrataData, 30 * 1000);
+        }).catch((err) => {
+            isMockMode = true;
+            document.getElementById('webcam-toggle-btn').innerText = 'OFF';
+            document.getElementById('ui-layer').style.display = 'flex';
+            setTimeout(() => {
+                gsap.to('#ui-layer', {opacity: 0, duration: 1.5, onComplete: () => {
+                    document.getElementById('ui-layer').style.display = 'none';
+                }});
+                enterExhibitionMode();
+                initThree();
+                animate();
+                setInterval(autoSaveStrataData, 30 * 1000); 
+            }, 3000);
+        });
+    }
+
+    function enterExhibitionMode() {
+        document.body.classList.add('hide-cursor');
+        gsap.to('#helper-text', { opacity: 0, duration: 1 }); 
+        isUIHidden = true;
+        document.getElementById('settings-layer').classList.remove('active');
+    }
+
+    function handleKeyDown(e) {
+        if (e.key === 'Escape') {
+            isUIHidden = !isUIHidden;
+            const settingsLayer = document.getElementById('settings-layer');
+            if (isUIHidden) {
+                document.body.classList.add('hide-cursor');
+                gsap.to('#helper-text', { opacity: 0, duration: 0.5 });
+                settingsLayer.classList.remove('active');
+            } else {
+                document.body.classList.remove('hide-cursor');
+                gsap.to('#helper-text', { opacity: 1, duration: 0.5 });
+                settingsLayer.classList.add('active');
+            }
+        }
+    }
+
+    function initWebcam() {
+        return new Promise((resolve, reject) => {
+            sampleCanvas.width = CONFIG.SAMPLE_WIDTH; sampleCanvas.height = CONFIG.SAMPLE_HEIGHT;
+            navigator.mediaDevices.getUserMedia({ 
+                video: { width: CONFIG.SAMPLE_WIDTH, height: CONFIG.SAMPLE_HEIGHT, facingMode: "user" } 
+            }).then((stream) => {
+                currentStream = stream;
+                video.srcObject = stream;
+                video.onloadedmetadata = () => { video.play(); resolve(); };
+            }).catch(reject);
+        });
+    }
+
+    function initThree() {
+        const canvas = document.getElementById('webgl-canvas');
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020204); // 아주 살짝 더 어둡게 하여 빛 강조
+        scene.fog = new THREE.FogExp2(0x020204, 0.0035); 
+        
+        camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+        camera.position.set(0, 15, 270); 
+        camera.lookAt(0, -10, 0);
+
+        // 안티앨리어싱 제거 및 고성능 GPU 사용 옵션 추가 (4K 환경 최적화)
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false, alpha: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        
+        // 4K 이상 환경에서 부하를 막기 위해 Pixel Ratio 동적 제한 (2560 초과시 1, 그 이하는 1.5)
+        const pixelRatio = window.innerWidth > 2560 ? 1 : Math.min(window.devicePixelRatio, 1.5);
+        renderer.setPixelRatio(pixelRatio);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambientLight);
+
+        // --- 부유하는 빛 먼지 (Ambient Dust) 생성 ---
+        const dustGeo = new THREE.BufferGeometry();
+        const dustCount = 800;
+        const dustPos = new Float32Array(dustCount * 3);
+        const dustColors = new Float32Array(dustCount * 3);
+        for(let i=0; i<dustCount; i++) {
+            dustPos[i*3] = (Math.random() - 0.5) * CONFIG.WORLD_WIDTH * 2.5;
+            dustPos[i*3+1] = (Math.random() - 0.5) * CONFIG.WORLD_HEIGHT * 2.5;
+            dustPos[i*3+2] = (Math.random() - 0.5) * 300 - 50; // 깊이감
+            
+            const pColor = new THREE.Color(STRATA_PALETTE[Math.floor(Math.random() * STRATA_PALETTE.length)]);
+            dustColors[i*3] = pColor.r; dustColors[i*3+1] = pColor.g; dustColors[i*3+2] = pColor.b;
+        }
+        dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+        dustGeo.setAttribute('color', new THREE.BufferAttribute(dustColors, 3));
+        
+        // 먼지용 커스텀 셰이더 (Bokeh 느낌)
+        const dustMat = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0.0 } },
+            vertexShader: `
+                attribute vec3 color; varying vec3 vColor; uniform float time;
+                void main() {
+                    vColor = color;
+                    vec3 pos = position;
+                    pos.y += sin(time * 0.5 + pos.x) * 15.0;
+                    pos.x += cos(time * 0.3 + pos.y) * 15.0;
+                    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                    gl_Position = projectionMatrix * mvPosition;
+                    gl_PointSize = (12.0 + sin(time * 2.0 + pos.z) * 5.0) * (300.0 / -mvPosition.z);
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor;
+                void main() {
+                    vec2 coord = gl_PointCoord - vec2(0.5);
+                    float dist = length(coord);
+                    if(dist > 0.5) discard;
+                    float alpha = smoothstep(0.5, 0.1, dist) * 0.15; // 매우 부드럽고 흐릿하게
+                    gl_FragColor = vec4(vColor, alpha);
+                }
+            `,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+        });
+        dustSystem = new THREE.Points(dustGeo, dustMat);
+        scene.add(dustSystem);
+        // ------------------------------------------
+
+        strataShadowGeo = new THREE.PlaneGeometry(CONFIG.WORLD_WIDTH, CONFIG.WORLD_DEPTH, CONFIG.X_BINS - 1, CONFIG.Z_BINS - 1);
+        strataShadowGeo.rotateX(-Math.PI / 2); 
+
+        shadowMat = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0.0 } },
+            vertexShader: `
+                varying float vY;
+                void main() {
+                    vY = position.y;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying float vY;
+                uniform float time;
+                void main() {
+                    vec3 darkVoid = vec3(0.01, 0.0, 0.02); 
+                    float strataLine = step(0.85, fract(vY * 0.4)); 
+                    float boundaryGlow = smoothstep(-10.0, 15.0, vY);
+                    vec3 edgeColor = mix(vec3(0.0), vec3(0.2, 0.0, 0.4), boundaryGlow * strataLine);
+                    float deepFade = smoothstep(-90.0, -10.0, vY);
+                    gl_FragColor = vec4(darkVoid + edgeColor * deepFade, 1.0);
+                }
+            `,
+            transparent: false, 
+            depthWrite: true
+        });
+
+        abyssMesh = new THREE.Mesh(strataShadowGeo, shadowMat);
+        scene.add(abyssMesh);
+
+        const videoTex = new THREE.VideoTexture(video);
+        videoTex.minFilter = THREE.LinearFilter; videoTex.magFilter = THREE.LinearFilter;
+
+        videoMat = new THREE.ShaderMaterial({
+            uniforms: { tDiffuse: { value: isMockMode ? null : videoTex }, time: { value: 0.0 } },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float time;
+                varying vec2 vUv;
+                float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+                float noise(vec2 p) {
+                    vec2 i = floor(p); vec2 f = fract(p); vec2 u = f*f*(3.0-2.0*f);
+                    return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
+                               mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+                }
+                float fbm(vec2 p) {
+                    float f = 0.0; float w = 0.5;
+                    for(int i=0; i<4; i++){ f += w * noise(p); p *= 2.0; w *= 0.5; }
+                    return f;
+                }
+                void main() {
+                    vec2 p = vec2(1.0 - vUv.x, vUv.y); 
+                    vec2 q = vec2(fbm(p * 3.0 + time * 0.1), fbm(p * 3.0 + vec2(1.0)));
+                    vec2 r = vec2(fbm(p * 2.0 + q + time * 0.15), fbm(p * 2.0 + q + vec2(2.3)));
+                    vec2 distortedUv = p + r * 0.12;
+                    vec4 texColor = texture2D(tDiffuse, distortedUv);
+                    float luma = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+                    luma = smoothstep(0.1, 0.85, luma); 
+                    vec3 auroraColor = mix(vec3(0.01, 0.0, 0.05), vec3(0.0, 0.4, 0.5), luma);
+                    auroraColor = mix(auroraColor, vec3(0.5, 0.1, 0.6), fbm(p * 5.0 - time * 0.2) * luma);
+                    float breath = sin(time * 1.5 + p.x * 5.0) * 0.5 + 0.5;
+                    auroraColor *= (0.6 + 0.3 * breath);
+                    float dist = distance(p, vec2(0.5));
+                    float vignette = smoothstep(0.6, 0.1, dist);
+                    float finalAlpha = luma * vignette * (0.15 + breath * 0.1);
+                    gl_FragColor = vec4(auroraColor, finalAlpha);
+                }
+            `,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending 
+        });
+
+        videoPlane = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.WORLD_WIDTH * 2.0, CONFIG.WORLD_HEIGHT * 2.0), videoMat);
+        videoPlane.position.z = -180; videoPlane.position.y = 20;
+        scene.add(videoPlane);
+
+        const renderScene = new THREE.RenderPass(scene, camera);
+        
+        // Bloom 해상도를 절반으로 줄이되 최대 1280x720으로 제한해 4K에서 발생하는 극심한 픽셀 부하 방지
+        const bloomW = Math.min(window.innerWidth / 2, 1280);
+        const bloomH = Math.min(window.innerHeight / 2, 720);
+        bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(bloomW, bloomH), 1.5, 0.7, 0.2);
+        
+        rgbShiftPass = new THREE.ShaderPass(LocalizedRGBShiftShader);
+        rgbShiftPass.uniforms['aspect'].value = window.innerWidth / window.innerHeight;
+        const filmPass = new THREE.FilmPass(0.2, 0.0, 0, false); 
+
+        composer = new THREE.EffectComposer(renderer);
+        composer.addPass(renderScene); 
+        composer.addPass(bloomPass); 
+        composer.addPass(rgbShiftPass);
+        composer.addPass(filmPass);
+
+        const total = CONFIG.MAX_PARTICLES;
+        positions = new Float32Array(total * 3); colors = new Float32Array(total * 3);
+        velocities = new Float32Array(total); active = new Uint8Array(total);
+        settled = new Float32Array(total); life = new Float32Array(total); 
+
+        heightGrid = new Array(CONFIG.X_BINS);
+        for(let x = 0; x < CONFIG.X_BINS; x++) heightGrid[x] = new Float32Array(CONFIG.Z_BINS);
+
+        for (let i = 0; i < total; i++) { positions[i * 3 + 1] = -9999; life[i] = Math.random() * 100; velocities[i] = 0; }
+
+        particleGeometry = new THREE.BufferGeometry();
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+        particleGeometry.setAttribute('customColor', new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage));
+        particleGeometry.setAttribute('aSettled', new THREE.BufferAttribute(settled, 1).setUsage(THREE.DynamicDrawUsage));
+        particleGeometry.setAttribute('aLife', new THREE.BufferAttribute(life, 1).setUsage(THREE.DynamicDrawUsage));
+        // 속도(Velocity) 속성 추가: 빛의 궤적(Trail) 구현용
+        particleGeometry.setAttribute('aVelocity', new THREE.BufferAttribute(velocities, 1).setUsage(THREE.DynamicDrawUsage));
+
+        particleMaterial = new THREE.ShaderMaterial({
+            uniforms: THREE.UniformsUtils.merge([ THREE.UniformsLib["fog"], { time: { value: 0.0 } } ]),
+            vertexShader: `
+                attribute vec3 customColor; attribute float aSettled; attribute float aLife;
+                varying vec3 vColor; varying float vSettled; varying vec3 vPos; varying float vLife;
+                uniform float time;
+                #include <fog_pars_vertex>
+                void main() {
+                    vColor = customColor; vSettled = aSettled; vPos = position; vLife = aLife + time; 
+                    vec3 finalPos = position;
+                    if(aSettled < 0.5) { finalPos.x += sin(vLife * 2.5) * 1.5; finalPos.z += cos(vLife * 2.0) * 1.5; }
+                    vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
+                    gl_Position = projectionMatrix * mvPosition;
+                    float size = aSettled > 0.5 ? 90.0 : 45.0 + sin(vLife * 8.0) * 15.0; 
+                    gl_PointSize = size * (300.0 / -mvPosition.z);
+                    #include <fog_vertex>
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor; varying float vSettled; varying vec3 vPos; varying float vLife;
+                uniform float time;
+                #include <fog_pars_fragment>
+                void main() {
+                    vec2 coord = gl_PointCoord - vec2(0.5); 
+                    float dist = length(coord);
+                    if(dist > 0.5) discard; 
+                    vec4 diffuseColor; 
+                    
+                    if (vSettled > 0.5) {
+                        // 결정체 지층(Crystalline Strata) 효과 강화: 코어를 날카롭게, 가로 퍼짐을 뚜렷하게
+                        float horizGlow = exp(-abs(coord.y) * 60.0) * exp(-abs(coord.x) * 2.0);
+                        float sharpCore = exp(-dist * 80.0); // 아주 밝고 뾰족한 코어
+                        float band = sin(vPos.y * 1.5) * 0.5 + 0.5;
+                        float shadowMask = smoothstep(0.4, -0.1, coord.y); 
+                        
+                        vec3 layerColor = mix(vColor * 0.3, vColor * 1.8, band * shadowMask);
+                        float alpha = smoothstep(0.5, 0.0, abs(coord.x)) * smoothstep(0.2, 0.0, abs(coord.y));
+                        
+                        diffuseColor = vec4(layerColor + (vColor * sharpCore), (horizGlow * 1.2 + sharpCore) * alpha * shadowMask); 
+                    } else {
+                        // 떨어지는 입자는 이전처럼 반짝이는 십자별 모양으로 복구
+                        float angle = time * 1.5 + vLife;
+                        float s = sin(angle), c = cos(angle);
+                        vec2 rCoord = vec2(c * coord.x - s * coord.y, s * coord.x + c * coord.y);
+                        float crossGlow = exp(-abs(rCoord.x)*30.0)*exp(-abs(rCoord.y)*6.0) + exp(-abs(rCoord.y)*30.0)*exp(-abs(rCoord.x)*6.0);
+                        float twinkle = sin(vLife * 15.0) * 0.5 + 0.5;
+                        vec3 flashColor = mix(vColor, vec3(0.8, 0.9, 1.0), twinkle * 0.3);
+                        diffuseColor = vec4(flashColor, (crossGlow + exp(-dist*25.0)) * (0.3 + twinkle * 0.4));
+                    }
+                    gl_FragColor = diffuseColor;
+                    #include <fog_fragment>
+                }
+            `,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: true 
+        });
+
+        particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+        particleSystem.frustumCulled = false; scene.add(particleSystem);
+
+        createInitialStrata(); 
+        window.addEventListener('resize', onWindowResize, false);
+    }
+
+    function createInitialStrata() {
+        let savedGrid = null;
+        try {
+            const savedStr = localStorage.getItem('strata_luminous_save');
+            if (savedStr) {
+                const parsed = JSON.parse(savedStr);
+                if (parsed.resolution && parsed.resolution.x === CONFIG.X_BINS && parsed.resolution.z === CONFIG.Z_BINS) savedGrid = parsed.data;
+            }
+        } catch(e) {}
+
+        const binWidthX = CONFIG.WORLD_WIDTH / CONFIG.X_BINS, binWidthZ = CONFIG.WORLD_DEPTH / CONFIG.Z_BINS;
+        const halfWorld = CONFIG.WORLD_WIDTH / 2, halfDepth = CONFIG.WORLD_DEPTH / 2;
+
+        for(let x = 0; x < CONFIG.X_BINS; x++) {
+            heightGrid[x] = new Float32Array(CONFIG.Z_BINS);
+            for(let z = 0; z < CONFIG.Z_BINS; z++) heightGrid[x][z] = savedGrid ? savedGrid[x][z] : -CONFIG.WORLD_HEIGHT / 2;
+        }
+        
+        const initParticleCount = savedGrid ? 35000 : 15000;
+        for(let i = 0; i < initParticleCount; i++) {
+            const x = Math.random() * CONFIG.WORLD_WIDTH - halfWorld; const z = Math.random() * CONFIG.WORLD_DEPTH - halfDepth;
+            let binX = Math.max(0, Math.min(CONFIG.X_BINS - 1, Math.floor((x + halfWorld) / binWidthX)));
+            let binZ = Math.max(0, Math.min(CONFIG.Z_BINS - 1, Math.floor((z + halfDepth) / binWidthZ)));
+            if (binX <= 1 || binX >= CONFIG.X_BINS - 2 || binZ === 0 || binZ === CONFIG.Z_BINS - 1) continue;
+            let py;
+            if (savedGrid) {
+                let baseY = savedGrid[binX][binZ];
+                py = Math.max(-CONFIG.WORLD_HEIGHT / 2, baseY - (Math.random() * (Math.random() < 0.85 ? 35 : CONFIG.WORLD_HEIGHT)));
+            } else {
+                const hillHeight = Math.sin((x + halfWorld) * 0.02) * 20 + Math.cos((z + halfDepth) * 0.04) * 12;
+                let baseY = -CONFIG.WORLD_HEIGHT / 2 + 10 + hillHeight;
+                py = -CONFIG.WORLD_HEIGHT / 2 + Math.random() * (baseY - (-CONFIG.WORLD_HEIGHT / 2));
+                if(py > heightGrid[binX][binZ]) heightGrid[binX][binZ] = py;
+            }
+            const idx = particleIdx++;
+            positions[idx * 3] = x; positions[idx * 3 + 1] = py; positions[idx * 3 + 2] = z;
+            const pColor = new THREE.Color(STRATA_PALETTE[Math.floor(Math.random() * STRATA_PALETTE.length)]);
+            colors[idx * 3] = pColor.r; colors[idx * 3 + 1] = pColor.g; colors[idx * 3 + 2] = pColor.b;
+            active[idx] = 1; settled[idx] = 1.0; velocities[idx] = 0;
+        }
+        particleGeometry.attributes.position.needsUpdate = true; particleGeometry.attributes.customColor.needsUpdate = true; particleGeometry.attributes.aSettled.needsUpdate = true;
+    }
+
+    function getBlendedColor(r, g, b) {
+        const time = Date.now() * 0.00015; 
+        const idx1 = Math.floor(time) % STRATA_PALETTE.length; const idx2 = (idx1 + 1) % STRATA_PALETTE.length;
+        let mixRatio = time - Math.floor(time);
+        mixRatio = mixRatio < 0.5 ? 2.0 * mixRatio * mixRatio : 1.0 - Math.pow(-2.0 * mixRatio + 2.0, 2.0) / 2.0;
+        const baseColor = new THREE.Color(STRATA_PALETTE[idx1]); const nextColor = new THREE.Color(STRATA_PALETTE[idx2]);
+        baseColor.lerp(nextColor, mixRatio); 
+        const camColor = new THREE.Color(r / 255, g / 255, b / 255); baseColor.lerp(camColor, 0.4);
+        const hsl = {}; baseColor.getHSL(hsl);
+        baseColor.setHSL(hsl.h, Math.max(0.7, hsl.s), Math.max(0.5, Math.min(0.8, hsl.l))); 
+        return baseColor;
+    }
+
+    function processMotion() {
+        const sw = CONFIG.SAMPLE_WIDTH, sh = CONFIG.SAMPLE_HEIGHT;
+        if (isMockMode) {
+            // 이전 잔상을 살짝 더 빨리 지워 꼬리를 줄임
+            ctx.fillStyle = 'rgba(3,3,5,0.15)'; ctx.fillRect(0, 0, sw, sh); 
+            // 이동 속도 슬라이더 적용
+            mockAngle += CONFIG.MOCK_SPEED; 
+            // 움직임 범위(Spread) 슬라이더 적용
+            const mx = sw/2 + Math.cos(mockAngle) * (45 * CONFIG.MOCK_SPREAD); 
+            const my = sh/2 + Math.sin(mockAngle * 1.5) * (25 * CONFIG.MOCK_SPREAD); 
+            ctx.beginPath(); 
+            // 가상 오브젝트(요정) 크기 슬라이더 적용
+            ctx.arc(mx, my, CONFIG.MOCK_SIZE, 0, Math.PI * 2); 
+            ctx.fillStyle = '#ffffff'; ctx.fill();
+        } else {
+            if (video.readyState >= 2) { 
+                ctx.save(); ctx.translate(sw, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0, sw, sh); ctx.restore();
+            } else return;
+        }
+
+        const currentFrame = ctx.getImageData(0, 0, sw, sh); const currentData = currentFrame.data;
+        if (!bgData) { bgData = new Float32Array(currentData.length); for(let i=0; i<currentData.length; i++) bgData[i] = currentData[i]; }
+
+        if (previousImageData) {
+            const prevData = previousImageData.data; const step = 2; 
+            let motionXSum = 0, motionYSum = 0, motionCount = 0;
+            
+            // 4K 최적화: 매 프레임 배열(Array) 생성을 피하고 사전 할당된 풀(Pool) 사용
+            let activeLen = 0; 
+            let presenceLen = 0; 
+
+            for (let y = 0; y < sh; y += step) {
+                for (let x = 0; x < sw; x += step) {
+                    const i = (y * sw + x) * 4;
+                    bgData[i] += (currentData[i] - bgData[i]) * 0.005; bgData[i+1] += (currentData[i+1] - bgData[i+1]) * 0.005; bgData[i+2] += (currentData[i+2] - bgData[i+2]) * 0.005;
+                    const motionDiff = Math.abs(currentData[i] - prevData[i]) + Math.abs(currentData[i+1] - prevData[i+1]) + Math.abs(currentData[i+2] - prevData[i+2]);
+                    const presenceDiff = Math.abs(currentData[i] - bgData[i]) + Math.abs(currentData[i+1] - bgData[i+1]) + Math.abs(currentData[i+2] - bgData[i+2]);
+                    const r = currentData[i], g = currentData[i+1], b = currentData[i+2];
+                    
+                    if (motionDiff > CONFIG.MOTION_THRESHOLD * 3) { 
+                        motionXSum += x; motionYSum += y; motionCount++; 
+                        if (activeLen < MAX_POOL_SIZE) {
+                            let pIdx = activeLen * 5;
+                            activePxPool[pIdx] = x; activePxPool[pIdx+1] = y; activePxPool[pIdx+2] = r; activePxPool[pIdx+3] = g; activePxPool[pIdx+4] = b;
+                            activeLen++;
+                        }
+                    } 
+                    else if (presenceDiff > CONFIG.PRESENCE_THRESHOLD * 3 && Math.random() < 0.02) {
+                        if (presenceLen < MAX_POOL_SIZE) {
+                            let pIdx = presenceLen * 5;
+                            presencePxPool[pIdx] = x; presencePxPool[pIdx+1] = y; presencePxPool[pIdx+2] = r; presencePxPool[pIdx+3] = g; presencePxPool[pIdx+4] = b;
+                            presenceLen++;
+                        }
+                    }
+                }
+            }
+            let spawnedThisFrame = 0;
+            if (motionCount > 0) {
+                lastMotionTime = Date.now();
+                const centerX = motionXSum / motionCount, centerY = motionYSum / motionCount;
+                globalMotion.x = (centerX / sw - 0.5) * CONFIG.WORLD_WIDTH; globalMotion.y = -(centerY / sh - 0.5) * CONFIG.WORLD_HEIGHT;
+                globalMotion.uvX = centerX / sw; globalMotion.uvY = 1.0 - (centerY / sh);
+                globalMotion.intensity = Math.min(motionCount / 400, 1.0);
+                
+                // 정렬(Sort) 연산 제거 및 O(1) 랜덤 샘플링을 통한 프레임 확보
+                for(let i = 0; i < CONFIG.MAX_SPAWN_PER_FRAME && activeLen > 0; i++) {
+                    const rIdx = Math.floor(Math.random() * activeLen) * 5;
+                    spawnParticle(activePxPool[rIdx], activePxPool[rIdx+1], centerX, centerY, activePxPool[rIdx+2], activePxPool[rIdx+3], activePxPool[rIdx+4]); 
+                    spawnedThisFrame++;
+                }
+                AudioEngine.updateMotion(globalMotion.intensity); targetBloomStrength = CONFIG.BASE_BLOOM + globalMotion.intensity * 0.4;
+            } else { 
+                AudioEngine.updateMotion(0.0); targetBloomStrength = CONFIG.BASE_BLOOM; 
+            }
+
+            let idleTime = Date.now() - lastMotionTime;
+            if (idleTime > 3000 && !isMockMode) {
+                let idleIntensity = Math.min((idleTime - 3000) / 5000, 1.0); 
+                let timeVal = Date.now() * 0.0005;
+                let phantomUVX = 0.5 + Math.sin(timeVal * 0.8) * Math.cos(timeVal * 0.4) * 0.4;
+                let phantomUVY = 0.5 + Math.cos(timeVal * 0.6) * Math.sin(timeVal * 0.3) * 0.3;
+                globalMotion.uvX = phantomUVX; globalMotion.uvY = phantomUVY; globalMotion.intensity = 0.15 * idleIntensity; 
+                let phantomX = phantomUVX * sw; let phantomY = (1.0 - phantomUVY) * sh;
+                if (Math.random() < 0.4 * idleIntensity) {
+                    let spawnCount = Math.floor(Math.random() * 5) + 1;
+                    for(let i=0; i<spawnCount; i++){ spawnParticle(phantomX + (Math.random()-0.5)*20, phantomY + (Math.random()-0.5)*20, phantomX, phantomY, 200, 200, 255); }
+                }
+            }
+
+            if (spawnedThisFrame < CONFIG.MAX_SPAWN_PER_FRAME && presenceLen > 0) {
+                const remainingSpawns = CONFIG.MAX_SPAWN_PER_FRAME - spawnedThisFrame;
+                for(let i = 0; i < remainingSpawns && presenceLen > 0; i++) {
+                    const rIdx = Math.floor(Math.random() * presenceLen) * 5;
+                    spawnParticle(presencePxPool[rIdx], presencePxPool[rIdx+1], presencePxPool[rIdx], presencePxPool[rIdx+1], presencePxPool[rIdx+2], presencePxPool[rIdx+3], presencePxPool[rIdx+4]); 
+                }
+            }
+        }
+        previousImageData = currentFrame;
+    }
+
+    function spawnParticle(x, y, centerX, centerY, r, g, b) {
+        const sw = CONFIG.SAMPLE_WIDTH, sh = CONFIG.SAMPLE_HEIGHT;
+        const px_origin = (x / sw - 0.5) * CONFIG.WORLD_WIDTH, px_center = (centerX / sw - 0.5) * CONFIG.WORLD_WIDTH;
+        const px = THREE.MathUtils.lerp(px_origin, px_center, 0.5) + (Math.random() - 0.5) * 16; 
+        const py_origin = -(y / sh - 0.5) * CONFIG.WORLD_HEIGHT;
+        const py_center = -(centerY / sh - 0.5) * CONFIG.WORLD_HEIGHT;
+        const py = THREE.MathUtils.lerp(py_origin, py_center, 0.5) + (Math.random() - 0.5) * 20;
+        const pz = ((y / sh) - 0.5) * CONFIG.WORLD_DEPTH * 0.8 + (Math.random() - 0.5) * 10;
+        const idx = particleIdx; const color = getBlendedColor(r, g, b);
+        positions[idx * 3] = px; positions[idx * 3 + 1] = py; positions[idx * 3 + 2] = pz;
+        colors[idx * 3] = color.r; colors[idx * 3 + 1] = color.g; colors[idx * 3 + 2] = color.b;
+        velocities[idx] = -0.3 - Math.random() * 0.5; // 속도를 음수로 하여 셰이더로 전달
+        active[idx] = 1; settled[idx] = 0.0; 
+        particleIdx = (particleIdx + 1) % CONFIG.MAX_PARTICLES;
+    }
+
+    function updatePhysics() {
+        const binWidthX = CONFIG.WORLD_WIDTH / CONFIG.X_BINS, binWidthZ = CONFIG.WORLD_DEPTH / CONFIG.Z_BINS;
+        const halfWorld = CONFIG.WORLD_WIDTH / 2, halfDepth = CONFIG.WORLD_DEPTH / 2;
+        let posUpdated = false, settledUpdated = false, velUpdated = false; 
+        const timeVal = Date.now() * 0.00045;
+
+        for(let x = 0; x < CONFIG.X_BINS; x++) {
+            const worldX = (x / CONFIG.X_BINS - 0.5) * CONFIG.WORLD_WIDTH;
+            const uplift = Math.sin(worldX * 0.015 + timeVal) * Math.cos(worldX * 0.01 - timeVal * 0.6) * 0.05;
+            for(let z = 0; z < CONFIG.Z_BINS; z++) if (heightGrid[x][z] > -CONFIG.WORLD_HEIGHT / 2 + 1) heightGrid[x][z] += uplift;
+        }
+
+        if (globalMotion.intensity > 0.1) {
+            let mBinX = Math.floor((globalMotion.x + halfWorld) / binWidthX);
+            if (mBinX > 2 && mBinX < CONFIG.X_BINS - 3) {
+                for(let z = 0; z < CONFIG.Z_BINS; z++) {
+                    if (Math.abs(globalMotion.y - heightGrid[mBinX][z]) < 40) {
+                        heightGrid[mBinX][z] -= 1.5 * globalMotion.intensity;
+                        heightGrid[mBinX-2][z] += 0.5 * globalMotion.intensity; heightGrid[mBinX+2][z] += 0.5 * globalMotion.intensity;
+                        posUpdated = true;
+                    }
+                }
+            }
+        }
+
+        if (Math.random() < 0.3) { 
+            for (let i = 0; i < CONFIG.MAX_PARTICLES; i++) {
+                if (active[i] === 1 && settled[i] === 1.0 && Math.random() < 0.0005) { 
+                    const i3 = i * 3;
+                    const px = positions[i3], py = positions[i3 + 1], pz = positions[i3 + 2];
+                    let binX = Math.floor((px + halfWorld) / binWidthX), binZ = Math.floor((pz + halfDepth) / binWidthZ);
+                    if (binX >= 0 && binX < CONFIG.X_BINS && binZ >= 0 && binZ < CONFIG.Z_BINS && py >= heightGrid[binX][binZ] - 1.8) {
+                        settled[i] = 0.0; velocities[i] = -0.3 - Math.random() * 0.5; 
+                        positions[i3] += (Math.random() - 0.5) * 16.0; 
+                        heightGrid[binX][binZ] -= CONFIG.PARTICLE_SIZE * 0.2;
+                        settledUpdated = true; posUpdated = true; velUpdated = true;
+                    }
+                }
+            }
+        }
+
+        for (let i = 0; i < CONFIG.MAX_PARTICLES; i++) {
+            if (active[i] === 1) {
+                const i3 = i * 3;
+                if (settled[i] === 0.0) {
+                    velocities[i] -= CONFIG.GRAVITY; velocities[i] *= 0.96; 
+                    positions[i3 + 1] += velocities[i];
+                    positions[i3] += Math.sin(timeVal * 4.0 + i) * 0.2; positions[i3 + 2] += Math.cos(timeVal * 3.5 + i) * 0.2;
+                    velUpdated = true;
+
+                    if (globalMotion.intensity > 0.05) {
+                        const distToMotion = positions[i3] - globalMotion.x, distToMotionY = positions[i3 + 1] - globalMotion.y;
+                        if (Math.abs(distToMotion) < 60 && Math.abs(distToMotionY) < 80) {
+                            const angle = Math.atan2(distToMotionY, distToMotion);
+                            positions[i3] += Math.cos(angle) * globalMotion.intensity * 1.8;
+                            positions[i3 + 1] += Math.sin(angle) * globalMotion.intensity * 1.8;
+                        }
+                    }
+                    const px = positions[i3], py = positions[i3 + 1], pz = positions[i3 + 2];
+                    let binX = Math.floor((px + halfWorld) / binWidthX), binZ = Math.floor((pz + halfDepth) / binWidthZ);
+                    if (binX <= 0 || binX >= CONFIG.X_BINS - 1 || binZ <= 0 || binZ >= CONFIG.Z_BINS - 1) { 
+                        active[i] = 0; positions[i3 + 1] = -9999; continue; 
+                    }
+                    if (py <= heightGrid[binX][binZ]) {
+                        let currX = binX, currZ = binZ, cascading = true, cascadeLimit = 8;
+                        while(cascading && cascadeLimit > 0) {
+                            let lowestH = heightGrid[currX][currZ], nextX = currX, nextZ = currZ;
+                            const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+                            for(let d of dirs) {
+                                let nx = currX + d[0], nz = currZ + d[1];
+                                if(nx >= 0 && nx < CONFIG.X_BINS && nz >= 0 && nz < CONFIG.Z_BINS) {
+                                    let nh = heightGrid[nx][nz];
+                                    if(lowestH - nh > CONFIG.SLIDE_THRESHOLD) { lowestH = nh; nextX = nx; nextZ = nz; }
+                                }
+                            }
+                            if(nextX !== currX || nextZ !== currZ) { currX = nextX; currZ = nextZ; cascadeLimit--; } 
+                            else cascading = false; 
+                        }
+                        
+                        let isVoidBurst = Math.random() < 0.25; 
+                        if (isVoidBurst) {
+                            heightGrid[currX][currZ] += 2.0 + Math.random() * 3.0; 
+                        } else {
+                            heightGrid[currX][currZ] += 0.25; 
+                        }
+                        
+                        positions[i3] = -halfWorld + (currX * binWidthX) + (binWidthX / 2) + (Math.random()-0.5)*binWidthX * 4.0;
+                        positions[i3 + 2] = -halfDepth + (currZ * binWidthZ) + (binWidthZ / 2) + (Math.random()-0.5)*binWidthZ * 3.0;
+                        positions[i3 + 1] = heightGrid[currX][currZ];
+                        settled[i] = 1.0; velocities[i] = 0; settledUpdated = true; velUpdated = true;
+                        AudioEngine.addSettled(positions[i3], positions[i3 + 1]);
+                    }
+                    posUpdated = true;
+                } else {
+                    const px = positions[i3];
+                    positions[i3 + 1] += Math.sin(px * 0.015 + timeVal) * Math.cos(px * 0.01 - timeVal * 0.6) * 0.05;
+                    let binX = Math.floor((px + halfWorld) / binWidthX), binZ = Math.floor((positions[i3 + 2] + halfDepth) / binWidthZ);
+                    if (binX >= 0 && binX < CONFIG.X_BINS && binZ >= 0 && binZ < CONFIG.Z_BINS && positions[i3 + 1] > heightGrid[binX][binZ] + 3.0) {
+                        settled[i] = 0.0; settledUpdated = true;
+                    }
+                    posUpdated = true;
+                }
+            }
+        }
+
+        let maxHeight = -CONFIG.WORLD_HEIGHT;
+        for (let x = 0; x < CONFIG.X_BINS; x++) for (let z = 0; z < CONFIG.Z_BINS; z++) if (heightGrid[x][z] > maxHeight) maxHeight = heightGrid[x][z];
+        let shiftAmount = maxHeight > -20 ? Math.min((maxHeight - -20) * 0.1, 2.5) : 0; 
+        if (shiftAmount > 0) {
+            for (let x = 0; x < CONFIG.X_BINS; x++) for (let z = 0; z < CONFIG.Z_BINS; z++) if (heightGrid[x][z] > -CONFIG.WORLD_HEIGHT / 2) heightGrid[x][z] -= shiftAmount; 
+            for (let i = 0; i < CONFIG.MAX_PARTICLES; i++) {
+                if (active[i] === 1 && settled[i] === 1.0) {
+                    const i3 = i * 3;
+                    positions[i3 + 1] -= shiftAmount;
+                    if (positions[i3 + 1] < -CONFIG.WORLD_HEIGHT / 2 - 25) { settled[i] = 0.0; active[i] = 0; positions[i3 + 1] = -9999; settledUpdated = true; }
+                    posUpdated = true;
+                }
+            }
+        }
+        
+        if (strataShadowGeo) {
+            const posAttr = strataShadowGeo.attributes.position;
+            for (let z = 0; z < CONFIG.Z_BINS; z++) {
+                for (let x = 0; x < CONFIG.X_BINS; x++) {
+                    const idx = z * CONFIG.X_BINS + x;
+                    let yVal = heightGrid[x][z] - 0.5; 
+                    if (z === 0 || z === CONFIG.Z_BINS - 1 || x === 0 || x === CONFIG.X_BINS - 1) yVal = -CONFIG.WORLD_HEIGHT; 
+                    posAttr.setY(idx, yVal);
+                }
+            }
+            posAttr.needsUpdate = true;
+        }
+        if (posUpdated) { particleGeometry.attributes.position.needsUpdate = true; particleGeometry.attributes.customColor.needsUpdate = true; }
+        if (settledUpdated) particleGeometry.attributes.aSettled.needsUpdate = true;
+        if (velUpdated) particleGeometry.attributes.aVelocity.needsUpdate = true;
+
+        globalMotion.intensity *= 0.9;
+    }
+
+    function autoSaveStrataData() {
+        const extractGrid = []; for(let x=0; x<CONFIG.X_BINS; x++) extractGrid.push(Array.from(heightGrid[x]));
+        try { localStorage.setItem('strata_luminous_save', JSON.stringify({ timestamp: new Date().toISOString(), resolution: { x: CONFIG.X_BINS, z: CONFIG.Z_BINS }, data: extractGrid })); } catch(e) { }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = Date.now() * 0.0001;
+
+        if(videoMat) videoMat.uniforms.time.value += 0.025;
+        if(particleMaterial) particleMaterial.uniforms.time.value += 0.012; 
+        if(shadowMat) shadowMat.uniforms.time.value += 0.01; 
+        if(dustSystem) dustSystem.material.uniforms.time.value += 0.015;
+        if(bloomPass) bloomPass.strength += (targetBloomStrength - bloomPass.strength) * 0.05;
+        
+        processMotion(); updatePhysics();
+        AudioEngine.updateAmbience(heightGrid); AudioEngine.tick();
+        
+        // --- 유기적인 카메라 호흡(Breathing & Parallax) ---
+        const rotationY = Math.sin(time) * 0.15;
+        const breathY = Math.cos(time * 0.8) * 5.0; // 위아래 유영
+        const breathZ = Math.sin(time * 0.4) * 20.0; // 앞뒤 유영
+
+        camera.position.x = Math.sin(time * 0.5) * 25; 
+        camera.position.y = 15 + breathY;
+        camera.position.z = 270 + breathZ;
+        camera.lookAt(0, -10 + (breathY * 0.2), 0);
+        // ------------------------------------------------
+
+        if(particleSystem) particleSystem.rotation.y = rotationY;
+        if(dustSystem) dustSystem.rotation.y = rotationY * 0.5; // 먼지는 절반 속도로 회전하여 깊이감 배가
+        if(videoPlane) videoPlane.rotation.y = rotationY;
+        if(abyssMesh) abyssMesh.rotation.y = rotationY; 
+        
+        if(rgbShiftPass) {
+            rgbShiftPass.uniforms['angle'].value = time * 8.0; 
+            const currentCenter = rgbShiftPass.uniforms['center'].value;
+            if (globalMotion.intensity > 0.05) {
+                currentCenter.x += (globalMotion.uvX - currentCenter.x) * 0.15;
+                currentCenter.y += (globalMotion.uvY - currentCenter.y) * 0.15;
+                rgbShiftPass.uniforms['amount'].value += ((0.005 + globalMotion.intensity * 0.015) - rgbShiftPass.uniforms['amount'].value) * 0.1;
+                rgbShiftPass.uniforms['radius'].value += (0.45 - rgbShiftPass.uniforms['radius'].value) * 0.1;
+            } else {
+                currentCenter.x += (0.5 - currentCenter.x) * 0.02;
+                currentCenter.y += (0.5 - currentCenter.y) * 0.02;
+                rgbShiftPass.uniforms['amount'].value += (0.0 - rgbShiftPass.uniforms['amount'].value) * 0.05;
+                rgbShiftPass.uniforms['radius'].value += (0.0 - rgbShiftPass.uniforms['radius'].value) * 0.05;
+            }
+            rgbShiftPass.uniforms['baseAmount'].value = 0.001 + Math.sin(time * 15.0) * 0.0005; 
+        }
+        composer.render();
+    }
+
+    function onWindowResize() {
+        if (!camera || !renderer || !composer) return;
+        
+        // 창 크기가 변경될 때도 4K 환경에 맞춰 Pixel Ratio 동적 계산
+        const pixelRatio = window.innerWidth > 2560 ? 1 : Math.min(window.devicePixelRatio, 1.5);
+        renderer.setPixelRatio(pixelRatio);
+        
+        camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
+        
+        // Bloom 해상도도 화면 절반으로 유지하되, 최대 1280x720 제한
+        if (bloomPass) {
+            const bloomW = Math.min(window.innerWidth / 2, 1280);
+            const bloomH = Math.min(window.innerHeight / 2, 720);
+            bloomPass.resolution.set(bloomW, bloomH);
+        }
+        if (rgbShiftPass) rgbShiftPass.uniforms['aspect'].value = window.innerWidth / window.innerHeight;
+    }
+</script>
+</body>
+</html>
